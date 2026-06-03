@@ -77,6 +77,7 @@ body::after{content:'';position:fixed;inset:0;
   text-align:center;background:var(--bg2);box-shadow:0 0 15px var(--glow),inset 0 0 15px rgba(0,0,0,0.5)}
 .ascii-logo{color:var(--fg-bright);font-size:clamp(5px,2.2vw,11px);line-height:1.15;
   white-space:pre;animation:glow-pulse 3s ease-in-out infinite;display:inline-block;max-width:100%}
+.logo-small{display:none}
 .header-sub{color:var(--fg-dim);margin-top:8px;font-size:14px;letter-spacing:3px}
 .header-sub span{color:var(--accent)}
 
@@ -191,6 +192,8 @@ body::after{content:'';position:fixed;inset:0;
 .fb-dot.local{background:#ffb000}
 
 @media(max-width:600px){
+  .logo-big{display:none}
+  .logo-small{display:inline-block;font-size:clamp(6px,2.5vw,10px)}
   .ascii-logo{font-size:clamp(4px,1.6vw,7px)}
   .c{padding:5px}
   .np-title{font-size:18px}
@@ -235,17 +238,33 @@ body::after{content:'';position:fixed;inset:0;
 <div class="c" id="app" style="display:none">
 
 <div class="header">
-<pre class="ascii-logo">
- ____  ____ ___  ___ ____
-|  _ \|  _ \   \/   / ___|
-| |_) | | | |\ /\ /\___ \
-|  _ <| |_| | |  | | ___) |
-|_| \_\____/  |__|_||____/
- __  __ _   _ ____ ___ ____
-|  \/  | | | / ___|_ _/ ___|
-| |\/| | | | \___ \| | |
-| |  | | |_| |___) | | |___
-|_|  |_|\___/|____/___\____|
+<pre class="ascii-logo logo-big">
+ /$$$$$$$                  /$$ /$$          /$$    /$$         /$$       /$$
+| $$__  $$                | $$|__/         | $$   | $$        |__/      | $$
+| $$  \ $$  /$$$$$$   /$$$$$$$ /$$  /$$$$$$| $$   | $$ /$$$$$$  /$$  /$$$$$$
+| $$$$$$$/ |____  $$ /$$__  $$| $$ /$$__  $$|  $$ / $$/$$__  $$| $$ /$$__  $$
+| $$__  $$  /$$$$$$$| $$  | $$| $$| $$  \ $$ \  $$ $$| $$  \ $$| $$| $$  | $$
+| $$  \ $$ /$$__  $$| $$  | $$| $$| $$  | $$  \  $$$/| $$  | $$| $$| $$  | $$
+| $$  | $$|  $$$$$$$|  $$$$$$$| $$|  $$$$$$/   \  $/ |  $$$$$$/| $$|  $$$$$$$
+|__/  |__/ \_______/ \_______/|__/ \______/     \_/    \______/ |__/ \_______/
+    _______________________________________________________________
+   |  ____  ____  ____    __  __ _   _ ____ ___ ____   ____  ____  |
+   | | __ )| __ )/ ___|  |  \/  | | | / ___|_ _/ ___| | __ )/ __ \ |
+   | |  _ \|  _ \\___ \  | |\/| | | | \___ \| | |     |  _ \\ \/ / |
+   | | |_) | |_) |___) | | |  | | |_| |___) | | |___  | |_) |>  <  |
+   | |____/|____/|____/  |_|  |_|\___/|____/___\____| |____//_/\_\ |
+   |_______________________________________________________________|
+</pre>
+<pre class="ascii-logo logo-small">
+ ____        _ _    _   __     _    _
+|  _ \ __ _ | (_)__| \ / ___  (_) _| |
+| |_) / _` || | / _` | V / _ \ | / _` |
+|  _ | (_| || | \__,_| | \___/ | \__,_|
+|_| \_\__,_||_|_\___/|_| \___/|_|\____|
+ ___ ___ ___   __  __ _   _ ___ ___ ___
+| _ ) _ ) __| |  \/  | | | / __|_ _/ __|
+| _ \ _ \__ \ | |\/| | |_| \__ \| | (__
+|___/___/___/ |_|  |_|\___/|___/___\___|
 </pre>
 <div class="header-sub">
   <span>[</span> UNDERGROUND MUSIC TERMINAL <span>]</span> -- EST. 1993 -- <span>[</span> v2.1 <span>]</span>
