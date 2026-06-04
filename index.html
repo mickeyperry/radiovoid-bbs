@@ -45,6 +45,7 @@ body::after{content:'';position:fixed;inset:0;
   pointer-events:none;z-index:9998}
 
 @keyframes flicker{0%{opacity:.97}100%{opacity:1}}
+@keyframes boot-fade-in{from{opacity:0;transform:scale(0.98)}to{opacity:1;transform:scale(1)}}
 @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
 @keyframes glow-pulse{0%,100%{text-shadow:0 0 5px var(--glow),0 0 10px var(--glow)}50%{text-shadow:0 0 10px var(--glow),0 0 20px var(--glow),0 0 30px var(--glow)}}
 @keyframes eq1{0%,100%{height:30%}50%{height:80%}}
@@ -71,6 +72,24 @@ body::after{content:'';position:fixed;inset:0;
 #gate .gate-btn:hover{background:var(--fg);color:var(--bg);box-shadow:0 0 15px var(--glow)}
 #gate .gate-error{color:#ff3333;font-size:14px;margin-top:8px;min-height:20px}
 #gate .gate-hint{color:var(--fg-dim);font-size:13px;margin-top:12px}
+
+/* BOOT SEQUENCE */
+#boot{position:fixed;inset:0;background:#000;z-index:10001;display:none;
+  padding:20px;overflow:hidden;font-family:'VT323',monospace}
+#boot.active{display:flex;flex-direction:column;justify-content:flex-start}
+#boot-log{color:var(--fg);font-size:14px;line-height:1.6;max-width:700px;width:100%;margin:20px auto}
+#boot-log .line{opacity:0;animation:boot-line .1s forwards}
+#boot-log .ok{color:#33ff00}
+#boot-log .warn{color:#ffb000}
+#boot-log .fail{color:#ff3333}
+#boot-log .accent{color:var(--accent)}
+#boot-log .bright{color:var(--fg-bright)}
+#boot-log .cursor{animation:blink .6s step-end infinite}
+@keyframes boot-line{to{opacity:1}}
+#boot-progress{width:100%;max-width:700px;margin:10px auto;height:6px;
+  border:1px solid var(--fg-dim);background:#000}
+#boot-progress-fill{height:100%;width:0%;background:var(--fg);
+  box-shadow:0 0 8px var(--glow);transition:width .3s}
 
 /* HEADER */
 .header{border:2px solid var(--border);padding:15px;margin-bottom:8px;
@@ -232,6 +251,12 @@ body::after{content:'';position:fixed;inset:0;
   <div class="gate-error" id="gate-err"></div>
   <div class="gate-hint">Contact SysOp for access credentials</div>
 </div>
+</div>
+
+<!-- ===== BOOT SEQUENCE ===== -->
+<div id="boot">
+  <div id="boot-log"></div>
+  <div id="boot-progress"><div id="boot-progress-fill"></div></div>
 </div>
 
 <!-- ===== MAIN APP ===== -->
@@ -448,7 +473,7 @@ async function checkAccess() {
   // Check sessionStorage first
   const saved = sessionStorage.getItem('rv_access');
   if (saved === 'admin' || saved === 'listener') {
-    grantAccess(saved === 'admin');
+    grantAccess(saved === 'admin', true);
     return;
   }
 }
@@ -460,15 +485,99 @@ async function tryKey(key) {
   return false;
 }
 
-function grantAccess(admin) {
+function grantAccess(admin, skipBoot) {
   S.isAdmin = admin;
   sessionStorage.setItem('rv_access', admin ? 'admin' : 'listener');
+
+  if (skipBoot) {
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('app').style.display = '';
+    document.getElementById('user-type').textContent = admin ? 'SYSOP' : 'LISTENER';
+    if (admin) document.getElementById('app').classList.add('is-admin');
+    resizeCanvas();
+    initFirebase();
+    return;
+  }
+
+  // Hide gate, show boot sequence
   document.getElementById('gate').classList.add('hidden');
-  document.getElementById('app').style.display = '';
-  document.getElementById('user-type').textContent = admin ? 'SYSOP' : 'LISTENER';
-  if (admin) document.getElementById('app').classList.add('is-admin');
-  resizeCanvas();
-  initFirebase();
+  document.getElementById('boot').classList.add('active');
+
+  const userType = admin ? 'SYSOP' : 'LISTENER';
+  const ip = Math.floor(Math.random()*255)+'.'+Math.floor(Math.random()*255)+'.'+Math.floor(Math.random()*255)+'.'+Math.floor(Math.random()*255);
+  const port = 23;
+  const now = new Date();
+  const ts = now.toISOString().replace('T',' ').split('.')[0];
+
+  const lines = [
+    {t:'', d:100},
+    {t:'Trying '+ip+'...', d:300},
+    {t:'Connected to radiovoid.underground.net.', d:400, c:'ok'},
+    {t:'Escape character is \'^]\'.', d:200},
+    {t:'', d:150},
+    {t:'╔══════════════════════════════════════════════╗', d:100, c:'accent'},
+    {t:'║     RADIOVOID BBS - TELNET ACCESS GRANTED    ║', d:100, c:'accent'},
+    {t:'╚══════════════════════════════════════════════╝', d:100, c:'accent'},
+    {t:'', d:100},
+    {t:'login: ********', d:500},
+    {t:'AUTHENTICATING KEY HASH...', d:600, c:'warn'},
+    {t:'ACCESS LEVEL: '+userType, d:300, c:'ok'},
+    {t:'', d:100},
+    {t:'['+ts+'] Session opened on node 7', d:200},
+    {t:'['+ts+'] Remote IP: '+ip+':'+port, d:150},
+    {t:'', d:100},
+    {t:'RADIOVOID BBS v2.1 - (C) 1993 VOID SYSTEMS', d:200, c:'bright'},
+    {t:'', d:80},
+    {t:'Initializing audio subsystem...........', d:400},
+    {t:'  > Audio codec: MPEG Layer III         [  OK  ]', d:200, c:'ok'},
+    {t:'  > Spectrum analyzer initialized       [  OK  ]', d:200, c:'ok'},
+    {t:'  > Waveform engine loaded              [  OK  ]', d:150, c:'ok'},
+    {t:'Loading track database.....................', d:500},
+    {t:'  > Firestore connection               [  OK  ]', d:200, c:'ok'},
+    {t:'  > Storage bucket mounted             [  OK  ]', d:200, c:'ok'},
+    {t:'Verifying system integrity..................', d:400},
+    {t:'  > CRT emulation module               [  OK  ]', d:150, c:'ok'},
+    {t:'  > Scanline filter active             [  OK  ]', d:150, c:'ok'},
+    {t:'  > Phosphor glow shader               [  OK  ]', d:150, c:'ok'},
+    {t:'  > Theme engine (7 presets)           [  OK  ]', d:100, c:'ok'},
+    {t:'', d:100},
+    {t:'All systems nominal.', d:300, c:'ok'},
+    {t:'', d:100},
+    {t:'Welcome aboard, '+userType+'. Enjoy the music.', d:400, c:'bright'},
+    {t:'', d:200},
+    {t:'Entering terminal...', d:600, c:'warn'},
+  ];
+
+  const log = document.getElementById('boot-log');
+  const progFill = document.getElementById('boot-progress-fill');
+  log.innerHTML = '';
+  let i = 0;
+  let totalDelay = 0;
+
+  lines.forEach((line, idx) => {
+    totalDelay += line.d;
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'line' + (line.c ? ' '+line.c : '');
+      div.textContent = line.t || '\u00A0';
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+      progFill.style.width = Math.round(((idx+1)/lines.length)*100) + '%';
+    }, totalDelay);
+  });
+
+  // After all lines, transition to app
+  totalDelay += 800;
+  setTimeout(() => {
+    document.getElementById('boot').classList.remove('active');
+    document.getElementById('boot').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    document.getElementById('app').style.animation = 'boot-fade-in .8s ease';
+    document.getElementById('user-type').textContent = userType;
+    if (admin) document.getElementById('app').classList.add('is-admin');
+    resizeCanvas();
+    initFirebase();
+  }, totalDelay);
 }
 
 document.getElementById('gate-go').addEventListener('click', async () => {
