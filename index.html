@@ -244,12 +244,16 @@ body::after{content:'';position:fixed;inset:0;
 </pre>
 <div class="gate-box">
   <div style="color:var(--fg-bright);font-size:18px;margin-bottom:6px">ACCESS TERMINAL</div>
-  <div style="color:var(--fg-dim);font-size:13px">ENTER PASSKEY TO CONNECT</div>
-  <input type="password" id="gate-key" placeholder="PASSKEY" autocomplete="off" spellcheck="false">
-  <br>
+  <div style="color:var(--fg-dim);font-size:13px">PUBLIC NODE — PRESS CONNECT TO LISTEN</div>
   <button class="gate-btn" id="gate-go">[ CONNECT ]</button>
+  <div id="sysop-panel" style="display:none;margin-top:12px;border-top:1px solid var(--fg-dim);padding-top:12px">
+    <div style="color:var(--fg-dim);font-size:13px">SYSOP PASSKEY</div>
+    <input type="password" id="gate-key" placeholder="PASSKEY" autocomplete="off" spellcheck="false">
+    <br>
+    <button class="gate-btn" id="sysop-go">[ SYSOP LOGIN ]</button>
+  </div>
   <div class="gate-error" id="gate-err"></div>
-  <div class="gate-hint">Contact SysOp for access credentials</div>
+  <div class="gate-hint" id="sysop-toggle" style="cursor:pointer">&gt; sysop login</div>
 </div>
 </div>
 
@@ -300,7 +304,10 @@ body::after{content:'';position:fixed;inset:0;
 
 <div class="fb-status">
   <span><span class="fb-dot local" id="fb-dot"></span><span id="fb-label">LOCAL MODE - Firebase not configured</span></span>
-  <span id="fb-tracks">0 cloud tracks</span>
+  <span>
+    <span id="fb-tracks">0 cloud tracks</span>
+    <button class="tbtn admin-only" id="logout-btn" style="margin-left:8px">[ SYSOP LOGOUT ]</button>
+  </span>
 </div>
 
 <div class="theme-bar">
@@ -422,15 +429,14 @@ body::after{content:'';position:fixed;inset:0;
 // CONFIG - Supabase
 // =============================================================
 const SUPABASE_URL = 'https://uhcxcnhsujsawgzfaeae.supabase.co';
+// Publishable (anon) key. Safe to expose publicly — every write is gated by
+// Supabase Row Level Security + auth, NOT by anything in this file.
 const SUPABASE_KEY = 'sb_publishable_oRCO4ISFS51ebU3-rpyxew_U_ktpJSs';
 
-// Access keys - SHA-256 hashes (never store plaintext keys!)
-// Default admin key: "radiovoid" | Default listener key: "music"
-// Generate new hashes at: console, crypto.subtle.digest('SHA-256', new TextEncoder().encode('yourkey'))
-const ACCESS_KEYS = {
-  admin: '50a7d16112ec228630c847f6b4e51f787866f98dcb84ab0a4a1e62dadc92a49e',
-  listener: '80f189984e5ca70287d13342f6daa0db45cba3c131c4e46dc81360f3a4c4f690'
-};
+// SysOp login. Your passkey is the PASSWORD of this single Supabase Auth user.
+// Only that authenticated user can upload/delete tracks (enforced server-side by RLS).
+// The email is just an identifier (not secret); the passkey is never stored in this file.
+const ADMIN_EMAIL = 'sysop@radiovoid.bbs';
 
 // =============================================================
 // STATE
@@ -445,25 +451,42 @@ const S = {
 // =============================================================
 // ACCESS GATE
 // =============================================================
-async function hashKey(key) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+// Loads the Supabase JS SDK and creates the client exactly once.
+let _sbReady = null;
+function ensureClient() {
+  if (_sbReady) return _sbReady;
+  _sbReady = (async () => {
+    if (!window.supabase) {
+      await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js');
+    }
+    if (!S.sb) S.sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return S.sb;
+  })();
+  return _sbReady;
 }
 
 async function checkAccess() {
-  // Check sessionStorage first
-  const saved = sessionStorage.getItem('rv_access');
-  if (saved === 'admin' || saved === 'listener') {
-    grantAccess(saved === 'admin', true);
-    return;
-  }
+  // If a SysOp is already logged in (persisted Supabase session), enter as admin.
+  try {
+    await ensureClient();
+    const { data } = await S.sb.auth.getSession();
+    if (data && data.session) { grantAccess(true, true); return; }
+  } catch (e) { /* offline / SDK blocked — fall through to public listener */ }
+  // Returning visitor who already connected this session: skip the splash.
+  if (sessionStorage.getItem('rv_access')) grantAccess(false, true);
 }
 
-async function tryKey(key) {
-  const h = await hashKey(key);
-  if (h === ACCESS_KEYS.admin) { grantAccess(true); return true; }
-  if (h === ACCESS_KEYS.listener) { grantAccess(false); return true; }
-  return false;
+// SysOp login: the passkey is verified by Supabase, never compared in this file.
+async function adminLogin(passkey) {
+  await ensureClient();
+  const { error } = await S.sb.auth.signInWithPassword({ email: ADMIN_EMAIL, password: passkey });
+  return !error;
+}
+
+async function adminLogout() {
+  try { if (S.sb) await S.sb.auth.signOut(); } catch (e) {}
+  sessionStorage.removeItem('rv_access');
+  location.reload();
 }
 
 function grantAccess(admin, skipBoot) {
@@ -561,15 +584,27 @@ function grantAccess(admin, skipBoot) {
   }, totalDelay);
 }
 
-document.getElementById('gate-go').addEventListener('click', async () => {
-  const key = document.getElementById('gate-key').value;
-  if (!key) { document.getElementById('gate-err').textContent = 'ENTER A KEY'; return; }
-  const ok = await tryKey(key);
-  if (!ok) document.getElementById('gate-err').textContent = 'ACCESS DENIED - INVALID KEY';
+// Public listener: one click to connect, no credentials required.
+document.getElementById('gate-go').addEventListener('click', () => grantAccess(false));
+
+// Reveal / hide the SysOp passkey panel.
+document.getElementById('sysop-toggle').addEventListener('click', () => {
+  const p = document.getElementById('sysop-panel');
+  p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+  if (p.style.display === 'block') document.getElementById('gate-key').focus();
 });
 
+async function doAdminLogin() {
+  const key = document.getElementById('gate-key').value;
+  const err = document.getElementById('gate-err');
+  if (!key) { err.textContent = 'ENTER PASSKEY'; return; }
+  err.textContent = 'AUTHENTICATING...';
+  if (await adminLogin(key)) grantAccess(true);
+  else err.textContent = 'ACCESS DENIED - INVALID PASSKEY';
+}
+document.getElementById('sysop-go').addEventListener('click', doAdminLogin);
 document.getElementById('gate-key').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('gate-go').click();
+  if (e.key === 'Enter') doAdminLogin();
 });
 
 checkAccess();
@@ -595,8 +630,7 @@ async function initCloud() {
   document.getElementById('fb-label').textContent = 'CONNECTING TO CLOUD...';
 
   try {
-    await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js');
-    S.sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    await ensureClient();
     S.cloudReady = true;
 
     document.getElementById('fb-dot').className = 'fb-dot on';
@@ -1040,6 +1074,8 @@ document.addEventListener('keydown', e => {
 });
 
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')}
+
+document.getElementById('logout-btn').addEventListener('click', adminLogout);
 </script>
 </body>
 </html>
