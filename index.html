@@ -185,6 +185,9 @@ body::after{content:'';position:fixed;inset:0;
 .trk-add{background:0;border:1px solid var(--fg-dim);color:var(--fg-dim);font-family:'VT323',monospace;
   font-size:15px;line-height:1;padding:1px 8px;cursor:pointer;min-width:26px}
 .trk-add:hover{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+.trk-del{background:0;border:1px solid var(--fg-dim);color:var(--fg-dim);font-family:'VT323',monospace;
+  font-size:13px;line-height:1;padding:1px 6px;cursor:pointer;min-width:34px}
+.trk-del:hover{color:#fff;background:#ff3333;border-color:#ff3333}
 .trk-meta-inline{display:none}
 
 /* PLAYLIST TOOLBAR + USER PLAYLISTS */
@@ -1122,6 +1125,7 @@ function renderPlaylist(filter){
       <span class="trk-bpm">${t.bpm||'—'}</span>
       <span class="trk-dur">${t.duration?fmt(t.duration):'--:--'}</span>
       <button class="trk-add" data-id="${t.id||''}" title="${pl?'Remove from playlist':'Add to a playlist'}">${pl?'✕':'+'}</button>
+      <button class="trk-del admin-only" data-del="${t.i}" title="Delete from cloud (SysOp)">DEL</button>
     </div>`).join('');
 
   list.querySelectorAll('.trk').forEach(el => {
@@ -1135,6 +1139,39 @@ function renderPlaylist(filter){
       else openAddMenu(btn, id);
     });
   });
+  list.querySelectorAll('.trk-del').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); deleteTrack(S.tracks[+btn.dataset.del]); });
+  });
+}
+
+// Derive the storage object key from a public URL (everything after "/tracks/").
+function storageKey(t){
+  const parts = (t.url || '').split('/tracks/');
+  return parts.length > 1 ? decodeURIComponent(parts[1].split('?')[0]) : null;
+}
+
+// SysOp: permanently remove a cloud track (storage file + DB row + any playlist refs).
+async function deleteTrack(t){
+  if (!t) return;
+  if (!S.isAdmin || !S.cloudReady){ alert('SysOp login required.'); return; }
+  if (!t.id){ alert('Only cloud tracks can be deleted here.'); return; }
+  if (!confirm('Permanently delete "'+t.title+'"?\nThis removes the file AND the track entry.')) return;
+  try {
+    const key = storageKey(t);
+    if (key){ const { error: se } = await S.sb.storage.from('tracks').remove([key]); if (se) console.warn('storage remove:', se); }
+    const { error: de } = await S.sb.from('tracks').delete().eq('id', t.id);
+    if (de) throw de;
+    // drop from any local playlists
+    S.playlists.forEach(p => { p.trackIds = p.trackIds.filter(x => x !== t.id); });
+    savePlaylists();
+    // if it's the current track, stop playback
+    if (S.idx >= 0 && S.tracks[S.idx] && S.tracks[S.idx].id === t.id){ stop(); S.idx = -1; }
+    await loadCloudTracks();
+    flash('Deleted ' + t.title);
+  } catch(e){
+    console.error('Delete failed:', e);
+    alert('Delete failed: ' + ((e && e.message) || e));
+  }
 }
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
