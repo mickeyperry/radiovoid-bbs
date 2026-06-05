@@ -60,6 +60,10 @@ body::after{content:'';position:fixed;inset:0;
 #gate.hidden{display:none}
 #gate pre{color:var(--fg-bright);font-size:clamp(7px,2.4vw,14px);line-height:1.4;
   white-space:pre;text-shadow:0 0 6px var(--glow);margin-bottom:20px;text-align:center;overflow-x:auto;max-width:100%}
+.gate-logo{margin-bottom:22px;text-align:center;animation:glow-pulse 3s ease-in-out infinite}
+.gate-logo-1{font-size:clamp(44px,13vw,96px);line-height:.85;color:var(--fg-bright);
+  letter-spacing:3px;font-weight:400}
+.gate-logo-2{font-size:clamp(14px,4vw,24px);color:var(--accent);letter-spacing:7px;margin-top:8px}
 #gate .gate-box{border:2px solid var(--border);padding:20px;background:var(--bg2);
   text-align:center;max-width:400px;width:100%;box-shadow:0 0 20px var(--glow)}
 #gate input{background:var(--bg);border:2px solid var(--border);color:var(--fg);
@@ -261,18 +265,10 @@ body::after{content:'';position:fixed;inset:0;
 
 <!-- ===== GATE / ACCESS SCREEN ===== -->
 <div id="gate">
-<pre>
- ____  _   _ ____  ____
-|  _ \| | | | __ )| __ )
-| |_) | | | |  _ \|  _ \
-|  _ &lt;  V  | |_) | |_) |
-|_| \_\_/ \_\____/|____/
-  __  __ _   _ ____ ___ ____
- |  \/  | | | / ___|_ _/ ___|
- | |\/| | | | \___ \| | |
- | |  | | |_| |___) | | |___
- |_|  |_|\___/|____/___\____|
-</pre>
+<div class="gate-logo">
+  <div class="gate-logo-1">RADIOVOID</div>
+  <div class="gate-logo-2">B B S &middot; M U S I C</div>
+</div>
 <div class="gate-box">
   <div style="color:var(--fg-bright);font-size:18px;margin-bottom:6px">ACCESS TERMINAL</div>
   <div style="color:var(--fg-dim);font-size:13px">PUBLIC NODE — PRESS CONNECT TO LISTEN</div>
