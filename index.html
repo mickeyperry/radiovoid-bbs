@@ -738,6 +738,56 @@ function readTags(file){
   });
 }
 
+// Read playback length from a standard audio file (without playing it).
+function probeAudioDuration(file){
+  return new Promise((resolve) => {
+    try {
+      const a = document.createElement('audio');
+      a.preload = 'metadata';
+      const url = URL.createObjectURL(file);
+      let done = false;
+      const finish = (d) => { if(done) return; done = true; URL.revokeObjectURL(url);
+        resolve(Number.isFinite(d) && d>0 ? d : null); };
+      a.addEventListener('loadedmetadata', () => finish(a.duration));
+      a.addEventListener('error', () => finish(null));
+      a.src = url;
+      setTimeout(() => finish(null), 8000);
+    } catch(e){ resolve(null); }
+  });
+}
+
+// Read length + BPM (initial tempo) from a tracker module via libopenmpt, no playback.
+async function probeModMeta(buffer){
+  try {
+    await ensureMod();
+    const L = window.libopenmpt;
+    const bytes = new Uint8Array(buffer);
+    const ptr = L._malloc(bytes.byteLength);
+    L.HEAPU8.set(bytes, ptr);
+    const mod = L._openmpt_module_create_from_memory(ptr, bytes.byteLength, 0, 0, 0);
+    if (!mod){ L._free(ptr); return { duration:null, bpm:null }; }
+    const dur = L._openmpt_module_get_duration_seconds(mod);
+    const tempo = L._openmpt_module_get_current_tempo(mod);
+    L._openmpt_module_destroy(mod);
+    L._free(ptr);
+    return {
+      duration: (Number.isFinite(dur) && dur>0) ? dur : null,
+      bpm: (Number.isFinite(tempo) && tempo>0) ? Math.round(tempo) : null
+    };
+  } catch(e){ return { duration:null, bpm:null }; }
+}
+
+// Unified metadata probe used on upload: { duration, bpm, year } — whatever the file has.
+async function probeMeta(file){
+  if (MOD_RE.test(file.name)){
+    try { const m = await probeModMeta(await file.arrayBuffer());
+      return { duration: m.duration, bpm: m.bpm, year: null }; }
+    catch(e){ return { duration:null, bpm:null, year:null }; }
+  }
+  const [tags, dur] = await Promise.all([ readTags(file), probeAudioDuration(file) ]);
+  return { duration: dur, bpm: tags.bpm, year: tags.year };
+}
+
 async function uploadToCloud(file) {
   if (!S.cloudReady || !S.isAdmin) return null;
   const fname = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -750,9 +800,11 @@ async function uploadToCloud(file) {
   const name = file.name.replace(/\.[^.]+$/, '');
   let artist = 'Unknown', title = name;
   if (name.includes(' - ')) { const p = name.split(' - '); artist = p[0].trim(); title = p.slice(1).join(' - ').trim(); }
-  const meta = await readTags(file);
+  const meta = await probeMeta(file);
   const { error: dbErr } = await S.sb.from('tracks').insert({
-    title, artist, url, filename: file.name, year: meta.year, bpm: meta.bpm
+    title, artist, url, filename: file.name,
+    year: meta.year, bpm: meta.bpm,
+    duration: meta.duration != null ? Math.round(meta.duration) : null
   });
   if (dbErr) throw dbErr;
   return url;
@@ -1196,6 +1248,15 @@ function ensureMod(){
 // =============================================================
 function curFilter(){ return document.getElementById('search').value.toLowerCase(); }
 
+// Compact metadata line for the NOW PLAYING area (e.g. "1994 · 125 BPM" or "TRACKER MODULE · 125 BPM").
+function metaLine(t){
+  const bits = [];
+  if (t.year) bits.push(t.year);
+  if (t.bpm)  bits.push(t.bpm + ' BPM');
+  const base = isModTrack(t) ? 'TRACKER MODULE' : (bits.length ? '' : '--- kbps');
+  return [base].concat(bits).filter(Boolean).join(' · ');
+}
+
 function stopPlayback(){
   try { S.audio.pause(); } catch(e){}
   if (S.modPlayer && S.modPlayer.currentPlayingNode){ try { S.modPlayer.stop(); } catch(e){} }
@@ -1211,7 +1272,7 @@ async function loadTrack(i, autoplay){
   const token = ++S.loadToken;
   document.getElementById('np-title').textContent = t.title;
   document.getElementById('np-artist').textContent = t.artist;
-  document.getElementById('np-info').textContent = S.isMod ? 'TRACKER MODULE' : '--- kbps';
+  document.getElementById('np-info').textContent = metaLine(t);
   document.getElementById('prog-fill').style.width = '0%';
   document.getElementById('t-cur').textContent = '00:00';
   document.getElementById('t-tot').textContent = t.duration ? fmt(t.duration) : '00:00';
@@ -1224,7 +1285,7 @@ async function loadTrack(i, autoplay){
       const buf = await (await fetch(t.url)).arrayBuffer();
       if (token !== S.loadToken) return;   // a newer track was selected meanwhile
       S.modBuffer = buf;
-      document.getElementById('np-info').textContent = 'TRACKER MODULE';
+      document.getElementById('np-info').textContent = metaLine(t);
     } catch(e){
       console.error('MOD load failed:', e);
       document.getElementById('np-info').textContent = 'MOD LOAD FAILED';
