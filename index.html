@@ -428,20 +428,10 @@ body::after{content:'';position:fixed;inset:0;
 
 <script>
 // =============================================================
-// CONFIG - Replace with your Firebase config when ready
+// CONFIG - Supabase
 // =============================================================
-const FIREBASE_CONFIG = null; // Set to your config object to enable cloud mode
-/*
-// Example - uncomment and fill in:
-const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "123456",
-  appId: "YOUR_APP_ID"
-};
-*/
+const SUPABASE_URL = 'https://uhcxcnhsujsawgzfaeae.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_oRCO4ISFS51ebU3-rpyxew_U_ktpJSs';
 
 // Access keys - SHA-256 hashes (never store plaintext keys!)
 // Default admin key: "radiovoid" | Default listener key: "music"
@@ -458,7 +448,7 @@ const S = {
   tracks: [], idx: -1, playing: false, shuffle: false, repeat: false,
   volume: 0.75, vizMode: 'bars', audioCtx: null, analyser: null,
   source: null, audio: new Audio(), gain: null, isAdmin: false,
-  firebaseReady: false
+  cloudReady: false, sb: null
 };
 
 // =============================================================
@@ -495,7 +485,7 @@ function grantAccess(admin, skipBoot) {
     document.getElementById('user-type').textContent = admin ? 'SYSOP' : 'LISTENER';
     if (admin) document.getElementById('app').classList.add('is-admin');
     resizeCanvas();
-    initFirebase();
+    initCloud();
     return;
   }
 
@@ -533,7 +523,7 @@ function grantAccess(admin, skipBoot) {
     {t:'  > Spectrum analyzer initialized       [  OK  ]', d:200, c:'ok'},
     {t:'  > Waveform engine loaded              [  OK  ]', d:150, c:'ok'},
     {t:'Loading track database.....................', d:500},
-    {t:'  > Firestore connection               [  OK  ]', d:200, c:'ok'},
+    {t:'  > Supabase connection                [  OK  ]', d:200, c:'ok'},
     {t:'  > Storage bucket mounted             [  OK  ]', d:200, c:'ok'},
     {t:'Verifying system integrity..................', d:400},
     {t:'  > CRT emulation module               [  OK  ]', d:150, c:'ok'},
@@ -576,7 +566,7 @@ function grantAccess(admin, skipBoot) {
     document.getElementById('user-type').textContent = userType;
     if (admin) document.getElementById('app').classList.add('is-admin');
     resizeCanvas();
-    initFirebase();
+    initCloud();
   }, totalDelay);
 }
 
@@ -594,11 +584,19 @@ document.getElementById('gate-key').addEventListener('keydown', e => {
 checkAccess();
 
 // =============================================================
-// FIREBASE (lazy loaded when configured)
+// SUPABASE (cloud storage & database)
 // =============================================================
-async function initFirebase() {
-  if (!FIREBASE_CONFIG) {
-    document.getElementById('fb-label').textContent = 'LOCAL MODE - Firebase not configured';
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function initCloud() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    document.getElementById('fb-label').textContent = 'LOCAL MODE - Supabase not configured';
     document.getElementById('fb-dot').className = 'fb-dot local';
     return;
   }
@@ -606,70 +604,59 @@ async function initFirebase() {
   document.getElementById('fb-label').textContent = 'CONNECTING TO CLOUD...';
 
   try {
-    // Load Firebase SDKs dynamically
-    await loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-    await loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js');
-    await loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js');
-
-    firebase.initializeApp(FIREBASE_CONFIG);
-    const db = firebase.firestore();
-    const storage = firebase.storage();
-    S.db = db;
-    S.storage = storage;
-    S.firebaseReady = true;
+    await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js');
+    S.sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    S.cloudReady = true;
 
     document.getElementById('fb-dot').className = 'fb-dot on';
     document.getElementById('fb-label').textContent = 'CLOUD CONNECTED';
 
-    // Load tracks from Firestore
-    loadCloudTracks();
+    // Load tracks
+    await loadCloudTracks();
 
-    // Real-time listener for track updates
-    db.collection('tracks').orderBy('addedAt','desc').onSnapshot(snap => {
-      const cloudTracks = [];
-      snap.forEach(doc => {
-        const d = doc.data();
-        cloudTracks.push({ id: doc.id, title: d.title, artist: d.artist,
-          url: d.url, duration: d.duration || null, cloud: true });
-      });
-      // Merge: keep local tracks, replace cloud tracks
-      S.tracks = [...cloudTracks, ...S.tracks.filter(t => !t.cloud)];
-      document.getElementById('fb-tracks').textContent = cloudTracks.length + ' cloud tracks';
-      renderPlaylist();
-    });
+    // Poll for new tracks every 30s (Supabase realtime needs auth for RLS)
+    setInterval(loadCloudTracks, 30000);
   } catch(err) {
-    console.error('Firebase init failed:', err);
+    console.error('Supabase init failed:', err);
     document.getElementById('fb-dot').className = 'fb-dot off';
     document.getElementById('fb-label').textContent = 'CLOUD ERROR - running local';
   }
 }
 
 async function loadCloudTracks() {
-  // Initial load handled by onSnapshot above
+  if (!S.cloudReady) return;
+  try {
+    const { data, error } = await S.sb.from('tracks').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    const cloudTracks = (data || []).map(t => ({
+      id: t.id, title: t.title, artist: t.artist,
+      url: t.url, duration: t.duration || null, cloud: true
+    }));
+    S.tracks = [...cloudTracks, ...S.tracks.filter(t => !t.cloud)];
+    document.getElementById('fb-tracks').textContent = cloudTracks.length + ' cloud tracks';
+    renderPlaylist();
+  } catch(err) {
+    console.error('Failed to load tracks:', err);
+  }
 }
 
 async function uploadToCloud(file) {
-  if (!S.firebaseReady || !S.isAdmin) return null;
-  const ref = S.storage.ref('tracks/' + Date.now() + '_' + file.name);
-  const snap = await ref.put(file);
-  const url = await snap.ref.getDownloadURL();
+  if (!S.cloudReady || !S.isAdmin) return null;
+  const fname = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const { data: upData, error: upErr } = await S.sb.storage.from('tracks').upload(fname, file, {
+    cacheControl: '3600', upsert: false
+  });
+  if (upErr) throw upErr;
+  const { data: urlData } = S.sb.storage.from('tracks').getPublicUrl(fname);
+  const url = urlData.publicUrl;
   const name = file.name.replace(/\.[^.]+$/, '');
   let artist = 'Unknown', title = name;
   if (name.includes(' - ')) { const p = name.split(' - '); artist = p[0].trim(); title = p.slice(1).join(' - ').trim(); }
-  await S.db.collection('tracks').add({
-    title, artist, url, filename: file.name,
-    addedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    addedBy: 'sysop'
+  const { error: dbErr } = await S.sb.from('tracks').insert({
+    title, artist, url, filename: file.name
   });
+  if (dbErr) throw dbErr;
   return url;
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src; s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
 }
 
 // =============================================================
@@ -886,12 +873,13 @@ async function handleFiles(files) {
     let artist = 'Unknown Artist', title = name;
     if (name.includes(' - ')) { const p = name.split(' - '); artist = p[0].trim(); title = p.slice(1).join(' - ').trim(); }
 
-    if (S.firebaseReady && S.isAdmin) {
+    if (S.cloudReady && S.isAdmin) {
       // Upload to cloud
       try {
         document.getElementById('fb-label').textContent = 'UPLOADING: ' + file.name;
         await uploadToCloud(file);
         document.getElementById('fb-label').textContent = 'CLOUD CONNECTED';
+        await loadCloudTracks();
       } catch(err) {
         console.error('Upload failed:', err);
         // Fallback to local
