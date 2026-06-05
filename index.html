@@ -185,6 +185,7 @@ body::after{content:'';position:fixed;inset:0;
 .trk-add{background:0;border:1px solid var(--fg-dim);color:var(--fg-dim);font-family:'VT323',monospace;
   font-size:15px;line-height:1;padding:1px 8px;cursor:pointer;min-width:26px}
 .trk-add:hover{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+.trk-meta-inline{display:none}
 
 /* PLAYLIST TOOLBAR + USER PLAYLISTS */
 .pl-tools{display:flex;gap:5px;align-items:center;flex-wrap:wrap;
@@ -198,7 +199,10 @@ body::after{content:'';position:fixed;inset:0;
 .pl-menu div{padding:7px 12px;cursor:pointer;font-size:15px;color:var(--fg);border-bottom:1px solid rgba(255,255,255,.05)}
 .pl-menu div:hover{background:var(--fg);color:var(--bg)}
 .pl-menu .pm-new{color:var(--accent)}
-@media(max-width:600px){.trk-year,.trk-bpm{display:none}}
+@media(max-width:600px){
+  .trk-year,.trk-bpm,.trk-dur{display:none}
+  .trk-meta-inline{display:inline;color:var(--fg-dim)}
+}
 
 /* UPLOAD */
 .upload{border:2px dashed var(--border);padding:20px;margin-bottom:8px;text-align:center;
@@ -439,6 +443,7 @@ body::after{content:'';position:fixed;inset:0;
     <button class="tbtn" id="pl-new">+ NEW</button>
     <button class="tbtn" id="pl-del" style="display:none">DEL</button>
     <button class="tbtn" id="pl-surprise">&#9860; SURPRISE</button>
+    <button class="tbtn admin-only" id="pl-rescan">RESCAN META</button>
   </div>
   <div class="tl" id="tl">
     <div style="padding:20px;text-align:center;color:var(--fg-dim)">
@@ -1111,7 +1116,7 @@ function renderPlaylist(filter){
       <span class="trk-n">${String(n+1).padStart(2,'0')}.</span>
       <div class="trk-i">
         <div class="trk-name">${esc(t.title)}</div>
-        <div class="trk-art">${esc(t.artist)}${t.cloud?' [CLOUD]':''}</div>
+        <div class="trk-art">${esc(t.artist)}${t.cloud?' [CLOUD]':''}<span class="trk-meta-inline">${metaInline(t)}</span></div>
       </div>
       <span class="trk-year">${t.year||'—'}</span>
       <span class="trk-bpm">${t.bpm||'—'}</span>
@@ -1133,6 +1138,15 @@ function renderPlaylist(filter){
 }
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// Compact "· year · bpm · length" appended under the title on mobile (where columns are hidden).
+function metaInline(t){
+  const b = [];
+  if (t.year) b.push(t.year);
+  if (t.bpm)  b.push(t.bpm + ' BPM');
+  if (t.duration) b.push(fmt(t.duration));
+  return b.length ? ' · ' + b.join(' · ') : '';
+}
 
 function removeFromPlaylist(pl, id){
   pl.trackIds = pl.trackIds.filter(x => x !== id);
@@ -1204,6 +1218,36 @@ document.getElementById('pl-surprise').addEventListener('click', () => {
   if (!rows.length) return;
   loadTrack(rows[Math.floor(Math.random()*rows.length)].i, true);
 });
+
+// Re-read metadata (year/bpm/length) from files ALREADY in storage and update the DB.
+// Lets you change metadata logic later without re-uploading anything.
+async function rescanMeta(){
+  if (!S.isAdmin || !S.cloudReady){ alert('Sysop login + cloud required.'); return; }
+  const cloud = S.tracks.filter(t => t.cloud && t.id);
+  if (!cloud.length){ alert('No cloud tracks to rescan.'); return; }
+  if (!confirm('Re-read metadata for '+cloud.length+' cloud track(s)? Files are not re-uploaded.')) return;
+  const lbl = document.getElementById('fb-label');
+  let n = 0, ok = 0;
+  for (const t of cloud){
+    n++;
+    try {
+      lbl.textContent = `RESCANNING ${n}/${cloud.length}: ${t.title}`;
+      const blob = await (await fetch(t.url)).blob();
+      const file = new File([blob], t.file || (t.title + '.mp3'), { type: blob.type });
+      const meta = await probeMeta(file);
+      const { error } = await S.sb.from('tracks').update({
+        year: meta.year, bpm: meta.bpm,
+        duration: meta.duration != null ? Math.round(meta.duration) : null
+      }).eq('id', t.id);
+      if (error) throw error;
+      ok++;
+    } catch(e){ console.error('Rescan failed for', t.title, e); }
+  }
+  lbl.textContent = 'CLOUD CONNECTED';
+  await loadCloudTracks();
+  alert('Rescan done — updated ' + ok + '/' + cloud.length + ' tracks.');
+}
+document.getElementById('pl-rescan').addEventListener('click', rescanMeta);
 
 document.getElementById('search').addEventListener('input', e => renderPlaylist(e.target.value.toLowerCase()));
 
