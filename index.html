@@ -58,8 +58,8 @@ body::after{content:'';position:fixed;inset:0;
 #gate{position:fixed;inset:0;background:var(--bg);z-index:10000;display:flex;
   align-items:center;justify-content:center;flex-direction:column;padding:20px}
 #gate.hidden{display:none}
-#gate pre{color:var(--fg-bright);font-size:clamp(6px,2vw,12px);line-height:1.15;
-  white-space:pre;animation:glow-pulse 3s ease-in-out infinite;margin-bottom:20px;text-align:center}
+#gate pre{color:var(--fg-bright);font-size:clamp(7px,2.4vw,14px);line-height:1.4;
+  white-space:pre;text-shadow:0 0 6px var(--glow);margin-bottom:20px;text-align:center;overflow-x:auto;max-width:100%}
 #gate .gate-box{border:2px solid var(--border);padding:20px;background:var(--bg2);
   text-align:center;max-width:400px;width:100%;box-shadow:0 0 20px var(--glow)}
 #gate input{background:var(--bg);border:2px solid var(--border);color:var(--fg);
@@ -94,8 +94,8 @@ body::after{content:'';position:fixed;inset:0;
 /* HEADER */
 .header{border:2px solid var(--border);padding:15px;margin-bottom:8px;
   text-align:center;background:var(--bg2);box-shadow:0 0 15px var(--glow),inset 0 0 15px rgba(0,0,0,0.5)}
-.ascii-logo{color:var(--fg-bright);font-size:clamp(5px,2.2vw,11px);line-height:1.15;
-  white-space:pre;animation:glow-pulse 3s ease-in-out infinite;display:inline-block;max-width:100%}
+.ascii-logo{color:var(--fg-bright);font-size:clamp(5px,2.2vw,11px);line-height:1.32;
+  white-space:pre;text-shadow:0 0 6px var(--glow);display:inline-block;max-width:100%;overflow-x:auto}
 .logo-small{display:none}
 .header-sub{color:var(--fg-dim);margin-top:8px;font-size:14px;letter-spacing:3px}
 .header-sub span{color:var(--accent)}
@@ -985,9 +985,11 @@ async function handleFiles(files) {
         await loadCloudTracks();
       } catch(err) {
         console.error('Upload failed:', err);
-        // Fallback to local
-        const url = URL.createObjectURL(file);
-        S.tracks.push({ url, title, artist, file: file.name, duration: null });
+        // Surface the real reason — do NOT silently fake a local copy that vanishes on reload.
+        const msg = (err && (err.message || err.error_description || err.error)) || 'unknown error';
+        document.getElementById('fb-label').textContent = 'UPLOAD FAILED: ' + msg;
+        alert('Upload failed for "' + file.name + '":\n\n' + msg +
+              '\n\nIf this mentions a missing "year"/"bpm" column, run the DB migration in Supabase.');
       }
     } else {
       const url = URL.createObjectURL(file);
