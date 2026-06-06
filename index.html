@@ -188,6 +188,9 @@ body::after{content:'';position:fixed;inset:0;
 .trk-del{background:0;border:1px solid var(--fg-dim);color:var(--fg-dim);font-family:'VT323',monospace;
   font-size:13px;line-height:1;padding:1px 6px;cursor:pointer;min-width:34px}
 .trk-del:hover{color:#fff;background:#ff3333;border-color:#ff3333}
+.trk-edit{background:0;border:1px solid var(--fg-dim);color:var(--fg-dim);font-family:'VT323',monospace;
+  font-size:14px;line-height:1;padding:1px 7px;cursor:pointer;min-width:26px}
+.trk-edit:hover{color:var(--bg);background:var(--fg-bright);border-color:var(--fg-bright)}
 .trk-meta-inline{display:none}
 
 /* PLAYLIST TOOLBAR + USER PLAYLISTS */
@@ -1125,6 +1128,7 @@ function renderPlaylist(filter){
       <span class="trk-bpm">${t.bpm||'—'}</span>
       <span class="trk-dur">${t.duration?fmt(t.duration):'--:--'}</span>
       <button class="trk-add" data-id="${t.id||''}" title="${pl?'Remove from playlist':'Add to a playlist'}">${pl?'✕':'+'}</button>
+      <button class="trk-edit admin-only" data-edit="${t.i}" title="Edit metadata (SysOp)">✎</button>
       <button class="trk-del admin-only" data-del="${t.i}" title="Delete from cloud (SysOp)">DEL</button>
     </div>`).join('');
 
@@ -1139,6 +1143,9 @@ function renderPlaylist(filter){
       else openAddMenu(btn, id);
     });
   });
+  list.querySelectorAll('.trk-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); editTrack(S.tracks[+btn.dataset.edit]); });
+  });
   list.querySelectorAll('.trk-del').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); deleteTrack(S.tracks[+btn.dataset.del]); });
   });
@@ -1151,26 +1158,64 @@ function storageKey(t){
 }
 
 // SysOp: permanently remove a cloud track (storage file + DB row + any playlist refs).
+// Confirm there is still a live SysOp session (writes are RLS-gated on it).
+async function requireSysop(){
+  if (!S.cloudReady){ alert('Cloud not connected.'); return false; }
+  let session = null;
+  try { const { data } = await S.sb.auth.getSession(); session = data && data.session; } catch(e){}
+  if (!session){ alert('Your SysOp session has expired.\nClick "> sysop login" again, then retry.'); return false; }
+  return true;
+}
+
 async function deleteTrack(t){
   if (!t) return;
-  if (!S.isAdmin || !S.cloudReady){ alert('SysOp login required.'); return; }
   if (!t.id){ alert('Only cloud tracks can be deleted here.'); return; }
+  if (!(await requireSysop())) return;
   if (!confirm('Permanently delete "'+t.title+'"?\nThis removes the file AND the track entry.')) return;
   try {
     const key = storageKey(t);
     if (key){ const { error: se } = await S.sb.storage.from('tracks').remove([key]); if (se) console.warn('storage remove:', se); }
-    const { error: de } = await S.sb.from('tracks').delete().eq('id', t.id);
+    const { data: del, error: de } = await S.sb.from('tracks').delete().eq('id', t.id).select();
     if (de) throw de;
-    // drop from any local playlists
+    if (!del || !del.length){
+      alert('Delete was blocked — the database removed 0 rows.\nMake sure you are logged in as the SysOp account.');
+      return;
+    }
     S.playlists.forEach(p => { p.trackIds = p.trackIds.filter(x => x !== t.id); });
     savePlaylists();
-    // if it's the current track, stop playback
     if (S.idx >= 0 && S.tracks[S.idx] && S.tracks[S.idx].id === t.id){ stop(); S.idx = -1; }
     await loadCloudTracks();
     flash('Deleted ' + t.title);
   } catch(e){
     console.error('Delete failed:', e);
     alert('Delete failed: ' + ((e && e.message) || e));
+  }
+}
+
+// SysOp: edit a track's title / artist / year / BPM in the database (works for mods too).
+async function editTrack(t){
+  if (!t || !t.id){ alert('Only cloud tracks can be edited.'); return; }
+  if (!(await requireSysop())) return;
+  const title  = prompt('Title:', t.title);            if (title  === null) return;
+  const artist = prompt('Artist:', t.artist);          if (artist === null) return;
+  const yearS  = prompt('Year (blank = none):', t.year || ''); if (yearS === null) return;
+  const bpmS   = prompt('BPM (blank = none):',  t.bpm  || ''); if (bpmS  === null) return;
+  const year = yearS.trim() === '' ? null : parseInt(yearS, 10);
+  const bpm  = bpmS.trim()  === '' ? null : parseInt(bpmS, 10);
+  try {
+    const { data: upd, error } = await S.sb.from('tracks').update({
+      title:  title.trim()  || t.title,
+      artist: artist.trim() || 'Unknown',
+      year: Number.isFinite(year) ? year : null,
+      bpm:  Number.isFinite(bpm)  ? bpm  : null
+    }).eq('id', t.id).select();
+    if (error) throw error;
+    if (!upd || !upd.length){ alert('Update blocked (0 rows). Are you logged in as the SysOp account?'); return; }
+    await loadCloudTracks();
+    flash('Updated ' + (title.trim() || t.title));
+  } catch(e){
+    console.error('Edit failed:', e);
+    alert('Edit failed: ' + ((e && e.message) || e));
   }
 }
 
