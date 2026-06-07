@@ -374,7 +374,7 @@ body::after{content:'';position:fixed;inset:0;
   <span><span class="fb-dot local" id="fb-dot"></span><span id="fb-label">LOCAL MODE - Firebase not configured</span></span>
   <span>
     <span id="fb-tracks">0 cloud tracks</span>
-    <button class="tbtn admin-only" id="logout-btn" style="margin-left:8px">[ SYSOP LOGOUT ]</button>
+    <button class="tbtn" id="logout-btn" style="margin-left:8px">[ DISCONNECT ]</button>
   </span>
 </div>
 
@@ -587,6 +587,7 @@ function revealApp(admin, anim){
   app.style.display = '';
   app.style.animation = anim || 'boot-fade-in .5s ease';
   document.getElementById('user-type').textContent = admin ? 'SYSOP' : 'LISTENER';
+  const lo = document.getElementById('logout-btn'); if (lo) lo.textContent = admin ? '[ SYSOP LOGOUT ]' : '[ DISCONNECT ]';
   if (admin) app.classList.add('is-admin');
   resizeCanvas();
   initCloud();
