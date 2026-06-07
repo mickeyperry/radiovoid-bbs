@@ -175,8 +175,8 @@ body::after{content:'';position:fixed;inset:0;
 .eq-bars.playing span:nth-child(4){animation:eq1 .6s ease infinite}
 
 /* PROGRESS */
-.prog-bg{width:100%;height:14px;border:1px solid var(--border);background:var(--bg);cursor:pointer;position:relative}
-.prog-fill{height:100%;background:var(--fg);width:0%;transition:width .3s linear;box-shadow:0 0 6px var(--glow)}
+.prog-bg{width:100%;height:14px;border:1px solid var(--border);background:var(--bg);cursor:pointer;position:relative;touch-action:none}
+.prog-fill{height:100%;background:var(--fg);width:0%;transition:width .1s linear;box-shadow:0 0 6px var(--glow)}
 .prog-times{display:flex;justify-content:space-between;font-size:13px;color:var(--fg-dim);margin-top:3px}
 
 /* CONTROLS */
@@ -186,8 +186,13 @@ body::after{content:'';position:fixed;inset:0;
 .cbtn:hover{background:var(--fg);color:var(--bg);box-shadow:0 0 12px var(--glow)}
 .cbtn.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .vol-c{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:14px;color:var(--fg-dim)}
-.vol-bg{width:80px;height:8px;border:1px solid var(--border);background:var(--bg);cursor:pointer;position:relative}
-.vol-fill{height:100%;background:var(--fg);width:75%;box-shadow:0 0 4px var(--glow)}
+.vol-bg{width:90px;height:10px;border:1px solid var(--border);background:var(--bg);cursor:pointer;position:relative;touch-action:none}
+.vol-fill{height:100%;background:var(--fg);width:75%;box-shadow:0 0 4px var(--glow);pointer-events:none}
+.vol-thumb,.prog-thumb{position:absolute;top:50%;transform:translate(-50%,-50%);background:var(--fg-bright);
+  box-shadow:0 0 6px var(--glow);pointer-events:none;border-radius:2px}
+.vol-thumb{width:14px;height:16px;left:75%}
+.prog-thumb{width:10px;height:20px;left:0%}
+.vol-bg:hover .vol-thumb,.prog-bg:hover .prog-thumb{background:var(--accent)}
 
 /* PLAYLIST */
 .pl{border:2px solid var(--border);margin-bottom:8px;background:var(--bg2)}
@@ -442,6 +447,7 @@ body::after{content:'';position:fixed;inset:0;
   <div>
     <div class="prog-bg" id="prog-bg">
       <div class="prog-fill" id="prog-fill"></div>
+      <div class="prog-thumb" id="prog-thumb"></div>
     </div>
     <div class="prog-times">
       <span id="t-cur">00:00</span>
@@ -459,6 +465,7 @@ body::after{content:'';position:fixed;inset:0;
       <span>VOL:</span>
       <div class="vol-bg" id="vol-bg">
         <div class="vol-fill" id="vol-fill"></div>
+        <div class="vol-thumb" id="vol-thumb"></div>
       </div>
       <span id="vol-pct">75%</span>
     </div>
@@ -1472,6 +1479,7 @@ async function loadTrack(i, autoplay){
   document.getElementById('np-artist').textContent = t.artist;
   document.getElementById('np-info').textContent = metaLine(t);
   document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-thumb').style.left = '0%';
   document.getElementById('t-cur').textContent = '00:00';
   document.getElementById('t-tot').textContent = t.duration ? fmt(t.duration) : '00:00';
   renderPlaylist(curFilter());
@@ -1541,6 +1549,7 @@ function stop(){
   S.playing = false;
   document.getElementById('b-play').textContent = '[ PLAY ]';
   document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-thumb').style.left = '0%';
   document.getElementById('t-cur').textContent = '00:00';
   document.getElementById('eq-bars').classList.remove('playing');
   renderPlaylist(curFilter());
@@ -1595,7 +1604,9 @@ function saveLast(time){
 
 S.audio.addEventListener('timeupdate', () => {
   if (S.isMod || !S.audio.duration) return;
-  document.getElementById('prog-fill').style.width = (S.audio.currentTime/S.audio.duration*100)+'%';
+  const pct = S.audio.currentTime/S.audio.duration*100;
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-thumb').style.left = pct+'%';
   document.getElementById('t-cur').textContent = fmt(S.audio.currentTime);
   saveLast(S.audio.currentTime);
   if ('mediaSession' in navigator && navigator.mediaSession.setPositionState){
@@ -1620,14 +1631,35 @@ setInterval(() => {
   if (!node) return;
   const cur = S.modPlayer.getCurrentTime();
   const dur = S.modPlayer.duration() || (S.tracks[S.idx] && S.tracks[S.idx].duration) || 0;
-  if (dur>0) document.getElementById('prog-fill').style.width = (cur/dur*100)+'%';
+  if (dur>0){ const pct = cur/dur*100;
+    document.getElementById('prog-fill').style.width = pct+'%';
+    document.getElementById('prog-thumb').style.left = pct+'%'; }
   document.getElementById('t-cur').textContent = fmt(cur);
   saveLast(cur);
 }, 250);
 
-document.getElementById('prog-bg').addEventListener('click', e => {
-  const r = e.currentTarget.getBoundingClientRect();
-  const frac = Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
+function setVol(v){
+  S.volume = Math.max(0, Math.min(1, v));
+  S.audio.volume = S.volume;
+  if (S.gain) S.gain.gain.value = S.volume;
+  document.getElementById('vol-fill').style.width = (S.volume*100)+'%';
+  document.getElementById('vol-thumb').style.left = (S.volume*100)+'%';
+  document.getElementById('vol-pct').textContent = Math.round(S.volume*100)+'%';
+  LS.set('rv_vol', S.volume);
+}
+
+// Make a bar click-and-drag (mouse + touch); calls onFrac(0..1) while dragging.
+function makeDraggable(bar, onFrac){
+  let dragging = false;
+  const fracAt = (x) => { const r = bar.getBoundingClientRect(); return Math.max(0, Math.min(1, (x - r.left) / r.width)); };
+  bar.addEventListener('pointerdown', e => { dragging = true; try { bar.setPointerCapture(e.pointerId); } catch(_){} onFrac(fracAt(e.clientX)); e.preventDefault(); });
+  bar.addEventListener('pointermove', e => { if (dragging) onFrac(fracAt(e.clientX)); });
+  const end = e => { dragging = false; try { bar.releasePointerCapture(e.pointerId); } catch(_){} };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
+}
+
+function seekFrac(frac){
   if (S.isMod){
     const node = S.modPlayer && S.modPlayer.currentPlayingNode;
     const dur = S.modPlayer && S.modPlayer.duration();
@@ -1636,19 +1668,12 @@ document.getElementById('prog-bg').addEventListener('click', e => {
     if (!S.audio.duration) return;
     S.audio.currentTime = frac*S.audio.duration;
   }
-});
-
-function setVol(v){
-  S.volume = Math.max(0, Math.min(1, v));
-  S.audio.volume = S.volume;
-  if (S.gain) S.gain.gain.value = S.volume;
-  document.getElementById('vol-fill').style.width = (S.volume*100)+'%';
-  document.getElementById('vol-pct').textContent = Math.round(S.volume*100)+'%';
-  LS.set('rv_vol', S.volume);
+  document.getElementById('prog-fill').style.width = (frac*100)+'%';
+  document.getElementById('prog-thumb').style.left = (frac*100)+'%';
 }
-document.getElementById('vol-bg').addEventListener('click', e => {
-  const r=e.currentTarget.getBoundingClientRect(); setVol((e.clientX-r.left)/r.width);
-});
+
+makeDraggable(document.getElementById('vol-bg'), setVol);
+makeDraggable(document.getElementById('prog-bg'), seekFrac);
 
 // Restore saved settings: volume, shuffle, repeat.
 setVol(parseFloat(LS.get('rv_vol', '0.75')) || 0.75);
