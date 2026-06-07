@@ -4,7 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>[ R A D I O  V O I D ] - BBS Music Terminal v2.1</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📻</text></svg>">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#ffb000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="RadioVoid">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
@@ -534,7 +541,14 @@ const S = {
   // tracker / mod playback
   isMod: false, modPlayer: null, modBuffer: null, modPaused: false, loadToken: 0,
   // library view + user playlists
-  view: 'library', sort: 'newest', playlists: []
+  view: 'library', sort: 'newest', playlists: [],
+  resumeTime: 0, restored: false
+};
+
+// Tiny localStorage helper (remembers volume, shuffle/repeat, view/sort, last track…).
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
 };
 
 // =============================================================
@@ -760,9 +774,22 @@ async function loadCloudTracks() {
     S.tracks = [...cloudTracks, ...S.tracks.filter(t => !t.cloud)];
     document.getElementById('fb-tracks').textContent = cloudTracks.length + ' cloud tracks';
     renderPlaylist();
+    if (!S.restored){ S.restored = true; restoreLastTrack(); }
   } catch(err) {
     console.error('Failed to load tracks:', err);
   }
+}
+
+// On first load, re-select the track you were last on (paused; position restored for audio).
+function restoreLastTrack(){
+  if (S.idx >= 0) return;
+  let last = null;
+  try { last = JSON.parse(LS.get('rv_last', '')); } catch(e){}
+  if (!last || !last.id) return;
+  const i = S.tracks.findIndex(t => t.id === last.id);
+  if (i < 0) return;
+  S.resumeTime = last.time || 0;   // applied in loadedmetadata for standard audio
+  loadTrack(i, false);             // select + show in Now Playing, do not autoplay
 }
 
 // Lazy-load the ID3/metadata tag reader and pull year + bpm from a file.
@@ -1324,8 +1351,8 @@ function createPlaylist(){
   return pl;
 }
 
-document.getElementById('view-select').addEventListener('change', e => { S.view = e.target.value; renderPlaylist(); });
-document.getElementById('sort-select').addEventListener('change', e => { S.sort = e.target.value; renderPlaylist(); });
+document.getElementById('view-select').addEventListener('change', e => { S.view = e.target.value; LS.set('rv_view', S.view); renderPlaylist(); });
+document.getElementById('sort-select').addEventListener('change', e => { S.sort = e.target.value; LS.set('rv_sort', S.sort); renderPlaylist(); });
 document.getElementById('pl-new').addEventListener('click', () => {
   const pl = createPlaylist();
   if (pl){ S.view = pl.id; document.getElementById('view-select').value = pl.id; renderPlaylist(); }
@@ -1375,7 +1402,11 @@ document.getElementById('pl-rescan').addEventListener('click', rescanMeta);
 document.getElementById('search').addEventListener('input', e => renderPlaylist(e.target.value.toLowerCase()));
 
 loadPlaylists();
+// restore last view + sort
+S.view = LS.get('rv_view', 'library');
+S.sort = LS.get('rv_sort', 'newest');
 refreshViewSelect();
+document.getElementById('sort-select').value = S.sort;
 
 // =============================================================
 // MOD / TRACKER ENGINE (libopenmpt via chiptune2.js)
@@ -1444,6 +1475,7 @@ async function loadTrack(i, autoplay){
   document.getElementById('t-cur').textContent = '00:00';
   document.getElementById('t-tot').textContent = t.duration ? fmt(t.duration) : '00:00';
   renderPlaylist(curFilter());
+  updateMediaSession();
   S.modBuffer = null;
   if (S.isMod){
     document.getElementById('np-info').textContent = 'LOADING MODULE...';
@@ -1487,6 +1519,7 @@ function play(){
   document.getElementById('b-play').textContent = '[ PAUSE ]';
   document.getElementById('eq-bars').classList.add('playing');
   renderPlaylist(curFilter());
+  updateMediaSession();
 }
 
 function pause(){
@@ -1500,6 +1533,7 @@ function pause(){
   document.getElementById('b-play').textContent = '[ PLAY ]';
   document.getElementById('eq-bars').classList.remove('playing');
   renderPlaylist(curFilter());
+  updateMediaSession();
 }
 
 function stop(){
@@ -1540,20 +1574,37 @@ document.getElementById('b-next').addEventListener('click', next);
 document.getElementById('b-prev').addEventListener('click', prev);
 document.getElementById('b-shuf').addEventListener('click', () => {
   S.shuffle=!S.shuffle; document.getElementById('b-shuf').classList.toggle('on',S.shuffle);
+  LS.set('rv_shuffle', S.shuffle ? '1' : '0');
 });
 document.getElementById('b-rpt').addEventListener('click', () => {
   S.repeat=!S.repeat; document.getElementById('b-rpt').classList.toggle('on',S.repeat);
+  LS.set('rv_repeat', S.repeat ? '1' : '0');
 });
+
+// Persist the current track + position so a reload picks up where you left off.
+let _lastSaveSec = -1;
+function saveLast(time){
+  if (S.idx < 0) return;
+  const t = S.tracks[S.idx];
+  if (!t || !t.id) return;
+  const sec = Math.floor(time || 0);
+  if (sec === _lastSaveSec) return;
+  _lastSaveSec = sec;
+  LS.set('rv_last', JSON.stringify({ id: t.id, time: S.isMod ? 0 : sec }));
+}
 
 S.audio.addEventListener('timeupdate', () => {
   if (S.isMod || !S.audio.duration) return;
   document.getElementById('prog-fill').style.width = (S.audio.currentTime/S.audio.duration*100)+'%';
   document.getElementById('t-cur').textContent = fmt(S.audio.currentTime);
+  saveLast(S.audio.currentTime);
 });
 
 S.audio.addEventListener('loadedmetadata', () => {
   if (S.isMod) return;
   document.getElementById('t-tot').textContent = fmt(S.audio.duration);
+  if (S.resumeTime > 0 && S.resumeTime < S.audio.duration){ try { S.audio.currentTime = S.resumeTime; } catch(e){} }
+  S.resumeTime = 0;
   if (S.idx>=0){ S.tracks[S.idx].duration = S.audio.duration; renderPlaylist(curFilter()); }
 });
 
@@ -1568,6 +1619,7 @@ setInterval(() => {
   const dur = S.modPlayer.duration() || (S.tracks[S.idx] && S.tracks[S.idx].duration) || 0;
   if (dur>0) document.getElementById('prog-fill').style.width = (cur/dur*100)+'%';
   document.getElementById('t-cur').textContent = fmt(cur);
+  saveLast(cur);
 }, 250);
 
 document.getElementById('prog-bg').addEventListener('click', e => {
@@ -1589,11 +1641,18 @@ function setVol(v){
   if (S.gain) S.gain.gain.value = S.volume;
   document.getElementById('vol-fill').style.width = (S.volume*100)+'%';
   document.getElementById('vol-pct').textContent = Math.round(S.volume*100)+'%';
+  LS.set('rv_vol', S.volume);
 }
 document.getElementById('vol-bg').addEventListener('click', e => {
   const r=e.currentTarget.getBoundingClientRect(); setVol((e.clientX-r.left)/r.width);
 });
-setVol(0.75);
+
+// Restore saved settings: volume, shuffle, repeat.
+setVol(parseFloat(LS.get('rv_vol', '0.75')) || 0.75);
+S.shuffle = LS.get('rv_shuffle', '0') === '1';
+S.repeat  = LS.get('rv_repeat',  '0') === '1';
+document.getElementById('b-shuf').classList.toggle('on', S.shuffle);
+document.getElementById('b-rpt').classList.toggle('on', S.repeat);
 
 // Keyboard
 document.addEventListener('keydown', e => {
@@ -1612,6 +1671,44 @@ document.addEventListener('keydown', e => {
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')}
 
 document.getElementById('logout-btn').addEventListener('click', adminLogout);
+
+// =============================================================
+// MEDIA SESSION (phone lock screen / Bluetooth / headset controls)
+// =============================================================
+function updateMediaSession(){
+  if (!('mediaSession' in navigator)) return;
+  const t = S.tracks[S.idx];
+  if (t){
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: t.title || 'Unknown',
+        artist: t.artist || '',
+        album: 'RadioVoid BBS',
+        artwork: [{ src: './icon.svg', sizes: 'any', type: 'image/svg+xml' }]
+      });
+    } catch(e){}
+  }
+  navigator.mediaSession.playbackState = S.playing ? 'playing' : 'paused';
+}
+if ('mediaSession' in navigator){
+  const ms = navigator.mediaSession;
+  const bind = (a, fn) => { try { ms.setActionHandler(a, fn); } catch(e){} };
+  bind('play',  () => { if (S.idx===-1 && S.tracks.length) loadTrack(0, true); else play(); });
+  bind('pause', () => pause());
+  bind('previoustrack', () => prev());
+  bind('nexttrack', () => next());
+  bind('stop', () => stop());
+  bind('seekto', (d) => { if (!S.isMod && d.seekTime != null){ try { S.audio.currentTime = d.seekTime; } catch(e){} } });
+}
+
+// =============================================================
+// PWA: register service worker (fast loads + offline shell)
+// =============================================================
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
