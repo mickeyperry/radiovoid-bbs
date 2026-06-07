@@ -1598,6 +1598,9 @@ S.audio.addEventListener('timeupdate', () => {
   document.getElementById('prog-fill').style.width = (S.audio.currentTime/S.audio.duration*100)+'%';
   document.getElementById('t-cur').textContent = fmt(S.audio.currentTime);
   saveLast(S.audio.currentTime);
+  if ('mediaSession' in navigator && navigator.mediaSession.setPositionState){
+    try { navigator.mediaSession.setPositionState({ duration: S.audio.duration, position: S.audio.currentTime, playbackRate: 1 }); } catch(e){}
+  }
 });
 
 S.audio.addEventListener('loadedmetadata', () => {
@@ -1695,8 +1698,13 @@ if ('mediaSession' in navigator){
   const bind = (a, fn) => { try { ms.setActionHandler(a, fn); } catch(e){} };
   bind('play',  () => { if (S.idx===-1 && S.tracks.length) loadTrack(0, true); else play(); });
   bind('pause', () => pause());
-  bind('previoustrack', () => prev());
-  bind('nexttrack', () => next());
+  // Lock-screen prev/next always jump tracks and start playing (no "restart current" guard).
+  bind('previoustrack', () => { if (!S.tracks.length) return;
+    const i = S.shuffle ? Math.floor(Math.random()*S.tracks.length) : (S.idx-1+S.tracks.length)%S.tracks.length;
+    loadTrack(i, true); });
+  bind('nexttrack', () => { if (!S.tracks.length) return;
+    const i = S.shuffle ? Math.floor(Math.random()*S.tracks.length) : (S.idx+1)%S.tracks.length;
+    loadTrack(i, true); });
   bind('stop', () => stop());
   bind('seekto', (d) => { if (!S.isMod && d.seekTime != null){ try { S.audio.currentTime = d.seekTime; } catch(e){} } });
 }
