@@ -95,6 +95,29 @@ body::after{content:'';position:fixed;inset:0;
 #boot-progress-fill{height:100%;width:0%;background:var(--fg);
   box-shadow:0 0 8px var(--glow);transition:width .3s}
 
+/* CRT CHANNEL-SWITCH INTRO */
+#crt{position:fixed;inset:0;z-index:10001;background:#000;display:none;overflow:hidden}
+.crt-noise{position:absolute;inset:0;opacity:.55;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,transparent 1px 2px),
+             repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,transparent 1px 3px);
+  animation:crt-static .09s steps(2) infinite}
+.crt-roll{position:absolute;left:0;right:0;height:16%;top:-20%;
+  background:linear-gradient(180deg,transparent,rgba(255,255,255,.20),transparent);
+  animation:crt-roll .5s linear 2}
+.crt-msg{position:absolute;top:9%;left:0;right:0;text-align:center;color:var(--fg-bright);
+  font-family:'VT323',monospace;font-size:30px;letter-spacing:5px;text-shadow:0 0 10px var(--glow);
+  animation:crt-jitter .1s steps(2) infinite}
+.crt-flash{position:absolute;inset:0;background:#fff;opacity:0;animation:crt-flash 1.05s ease forwards}
+@keyframes crt-static{from{transform:translateY(0)}to{transform:translateY(-2px)}}
+@keyframes crt-roll{from{top:-20%}to{top:120%}}
+@keyframes crt-jitter{0%{transform:translateX(-3px)}100%{transform:translateX(3px)}}
+@keyframes crt-flash{0%,70%{opacity:0}80%{opacity:.9}100%{opacity:0}}
+@keyframes crt-on{
+  0%{transform:scale(1,.004);filter:brightness(4);opacity:.9}
+  35%{transform:scale(1,.02);filter:brightness(3)}
+  60%{transform:scale(1,1);filter:brightness(1.8)}
+  100%{transform:scale(1,1);filter:none;opacity:1}}
+
 /* HEADER */
 .header{border:2px solid var(--border);padding:15px;margin-bottom:8px;
   text-align:center;background:var(--bg2);box-shadow:0 0 15px var(--glow),inset 0 0 15px rgba(0,0,0,0.5)}
@@ -298,6 +321,14 @@ body::after{content:'';position:fixed;inset:0;
 <div id="boot">
   <div id="boot-log"></div>
   <div id="boot-progress"><div id="boot-progress-fill"></div></div>
+</div>
+
+<!-- ===== CRT CHANNEL-SWITCH INTRO ===== -->
+<div id="crt">
+  <div class="crt-noise"></div>
+  <div class="crt-roll"></div>
+  <div class="crt-msg">— CH 07 —</div>
+  <div class="crt-flash"></div>
 </div>
 
 <!-- ===== MAIN APP ===== -->
@@ -547,22 +578,40 @@ async function adminLogout() {
   location.reload();
 }
 
+// Reveal the main interface (shared by both intros + the instant/skip path).
+function revealApp(admin, anim){
+  document.getElementById('gate').classList.add('hidden');
+  const boot = document.getElementById('boot'); boot.classList.remove('active'); boot.style.display = 'none';
+  const crt = document.getElementById('crt'); if (crt){ crt.classList.remove('active'); crt.style.display = 'none'; }
+  const app = document.getElementById('app');
+  app.style.display = '';
+  app.style.animation = anim || 'boot-fade-in .5s ease';
+  document.getElementById('user-type').textContent = admin ? 'SYSOP' : 'LISTENER';
+  if (admin) app.classList.add('is-admin');
+  resizeCanvas();
+  initCloud();
+}
+
+// Quick CRT channel-change / power-on glitch, then snap into the interface.
+function crtIntro(admin){
+  document.getElementById('gate').classList.add('hidden');
+  const crt = document.getElementById('crt');
+  crt.style.display = 'block';
+  crt.classList.add('active');
+  const msg = crt.querySelector('.crt-msg'); if (msg) msg.textContent = admin ? '— SYSOP CH 07 —' : '— CH 07 —';
+  setTimeout(() => revealApp(admin, 'crt-on .55s ease-out'), 1050);
+}
+
 function grantAccess(admin, skipBoot) {
   S.isAdmin = admin;
   sessionStorage.setItem('rv_access', admin ? 'admin' : 'listener');
 
-  if (skipBoot) {
-    document.getElementById('gate').classList.add('hidden');
-    document.getElementById('app').style.display = '';
-    document.getElementById('user-type').textContent = admin ? 'SYSOP' : 'LISTENER';
-    if (admin) document.getElementById('app').classList.add('is-admin');
-    resizeCanvas();
-    initCloud();
-    return;
-  }
+  if (skipBoot) { revealApp(admin); return; }
 
-  // Hide gate, show boot sequence
-  document.getElementById('gate').classList.add('hidden');
+  // Shuffle a different intro on each login.
+  if (Math.random() < 0.5) { crtIntro(admin); return; }
+
+  // ---- Telnet boot intro ----
   document.getElementById('boot').classList.add('active');
 
   const userType = admin ? 'SYSOP' : 'LISTENER';
@@ -613,11 +662,11 @@ function grantAccess(admin, skipBoot) {
   const log = document.getElementById('boot-log');
   const progFill = document.getElementById('boot-progress-fill');
   log.innerHTML = '';
-  let i = 0;
+  const SPEED = 0.3;   // <1 = faster boot (was effectively 1.0)
   let totalDelay = 0;
 
   lines.forEach((line, idx) => {
-    totalDelay += line.d;
+    totalDelay += line.d * SPEED;
     setTimeout(() => {
       const div = document.createElement('div');
       div.className = 'line' + (line.c ? ' '+line.c : '');
@@ -629,17 +678,8 @@ function grantAccess(admin, skipBoot) {
   });
 
   // After all lines, transition to app
-  totalDelay += 800;
-  setTimeout(() => {
-    document.getElementById('boot').classList.remove('active');
-    document.getElementById('boot').style.display = 'none';
-    document.getElementById('app').style.display = '';
-    document.getElementById('app').style.animation = 'boot-fade-in .8s ease';
-    document.getElementById('user-type').textContent = userType;
-    if (admin) document.getElementById('app').classList.add('is-admin');
-    resizeCanvas();
-    initCloud();
-  }, totalDelay);
+  totalDelay += 250;
+  setTimeout(() => revealApp(admin, 'boot-fade-in .5s ease'), totalDelay);
 }
 
 // Public listener: one click to connect, no credentials required.
