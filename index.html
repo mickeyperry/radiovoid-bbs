@@ -310,7 +310,11 @@ body::after{content:'';position:fixed;inset:0;
   border:2px solid var(--border);color:var(--fg);font-family:'VT323',monospace;font-size:16px;
   padding:8px 14px;cursor:pointer;box-shadow:0 0 12px var(--glow)}
 #chat-toggle:hover{background:var(--fg);color:var(--bg)}
-#chat-toggle .badge{color:var(--accent);margin-left:4px}
+.chat-badge{position:absolute;top:-9px;right:-9px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;
+  background:var(--accent);color:#000;font-size:13px;line-height:20px;text-align:center;font-weight:bold;
+  display:none;box-shadow:0 0 10px var(--accent);animation:chat-pulse 1.2s ease-in-out infinite}
+.chat-badge.show{display:block}
+@keyframes chat-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
 #chat{position:fixed;right:14px;bottom:62px;z-index:9998;width:360px;max-width:calc(100vw - 28px);
   height:60vh;max-height:560px;background:var(--bg2);border:2px solid var(--border);
   box-shadow:0 0 24px var(--glow);display:none;flex-direction:column}
@@ -559,11 +563,11 @@ body::after{content:'';position:fixed;inset:0;
   "The best things in life are free... like this BBS."<br>
   <div class="div">-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-</div>
   SysOp: VOID | FidoNet 2:240/1120 | Telnet: radiovoid.underground.net<br>
-  <span style="color:var(--fg-dim);font-size:11px">build 0608b</span>
+  <span style="color:var(--fg-dim);font-size:11px">build 0608c</span>
 </div>
 
 <!-- ===== CHAT / SHOUTBOX ===== -->
-<button id="chat-toggle" title="Toggle chat (Alt-Y)">&#9635; CHAT</button>
+<button id="chat-toggle" title="Toggle chat (Alt-Y)">&#9635; CHAT<span class="chat-badge" id="chat-badge"></span></button>
 <div id="chat">
   <div class="chat-head">
     <span class="chat-title">&#9618; CHAT</span>
@@ -1795,8 +1799,29 @@ if ('mediaSession' in navigator){
 // =============================================================
 // CHAT / SHOUTBOX (Alt-Y toggle, polling, anyone posts, SysOp moderates)
 // =============================================================
-const CHAT = { open: false, timer: null, nick: '' };
+const CHAT = { open: false, timer: null, nick: '', lastSeen: parseInt(LS.get('rv_chat_seen', '0'), 10) || 0 };
 const $chat = (id) => document.getElementById(id);
+
+function setBadge(n){
+  const b = $chat('chat-badge');
+  if (!b) return;
+  if (n > 0 && !CHAT.open){ b.textContent = n > 9 ? '9+' : String(n); b.classList.add('show'); }
+  else b.classList.remove('show');
+}
+function markSeen(maxId){
+  if (maxId && maxId > CHAT.lastSeen){ CHAT.lastSeen = maxId; LS.set('rv_chat_seen', String(maxId)); }
+  setBadge(0);
+}
+// Background check (runs while chat is closed) — lights the unread badge.
+async function chatCheckUnread(){
+  if (CHAT.open || !S.cloudReady || !S.sb) return;
+  try {
+    const { count, error } = await S.sb.from('messages').select('*', { count: 'exact', head: true }).gt('id', CHAT.lastSeen);
+    if (error) throw error;
+    setBadge(count || 0);
+  } catch(e){}
+}
+setInterval(chatCheckUnread, 12000);
 
 function getNick(){ if (!CHAT.nick) CHAT.nick = LS.get('rv_nick', '') || ''; return CHAT.nick; }
 function setNick(n){
@@ -1821,7 +1846,9 @@ async function chatLoad(){
   try {
     const { data, error } = await S.sb.from('messages').select('*').order('id', { ascending: false }).limit(60);
     if (error) throw error;
+    const maxId = (data && data.length) ? data[0].id : 0;
     renderChat((data || []).reverse());
+    if (CHAT.open) markSeen(maxId);   // viewing = caught up
   } catch(e){ /* table may not exist yet — ignore */ }
 }
 
