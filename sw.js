@@ -1,6 +1,6 @@
 // RadioVoid BBS service worker — fast loads + offline shell.
 // Caches the app shell + static CDN libs. Never caches Supabase (API or audio).
-const CACHE = 'rv-shell-v3';
+const CACHE = 'rv-shell-v4';
 const SHELL = ['./', './index.html', './icon.svg', './manifest.webmanifest'];
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net'];
 
