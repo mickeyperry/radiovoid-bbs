@@ -844,7 +844,18 @@ async function loadCloudTracks() {
     S.tracks = [...cloudTracks, ...S.tracks.filter(t => !t.cloud)];
     document.getElementById('fb-tracks').textContent = cloudTracks.length + ' cloud tracks';
     renderPlaylist();
-    if (!S.restored){ S.restored = true; restoreLastTrack(); }
+    // Deep link: ?play=<track-id> jumps straight to that track (shared links).
+    const deepId = new URLSearchParams(location.search).get('play');
+    if (deepId && !S.deepTried){
+      S.deepTried = true;
+      S.restored = true;
+      const di = S.tracks.findIndex(t => t.id === deepId);
+      if (di >= 0){
+        loadTrack(di, true);
+        // Autoplay may be blocked without a gesture — first tap anywhere starts it.
+        document.addEventListener('pointerdown', () => { if (!S.playing) play(); }, { once: true });
+      }
+    } else if (!S.restored){ S.restored = true; restoreLastTrack(); }
   } catch(err) {
     console.error('Failed to load tracks:', err);
   }
