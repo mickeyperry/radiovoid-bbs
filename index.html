@@ -306,7 +306,7 @@ body::after{content:'';position:fixed;inset:0;
 }
 
 /* CHAT / SHOUTBOX */
-#chat-toggle{position:fixed;right:14px;bottom:14px;z-index:9997;background:var(--bg2);
+#chat-toggle{position:fixed;right:14px;bottom:42px;z-index:9997;background:var(--bg2);
   border:2px solid var(--border);color:var(--fg);font-family:'VT323',monospace;font-size:16px;
   padding:8px 14px;cursor:pointer;box-shadow:0 0 12px var(--glow)}
 #chat-toggle:hover{background:var(--fg);color:var(--bg)}
@@ -315,7 +315,7 @@ body::after{content:'';position:fixed;inset:0;
   display:none;box-shadow:0 0 10px var(--accent);animation:chat-pulse 1.2s ease-in-out infinite}
 .chat-badge.show{display:block}
 @keyframes chat-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
-#chat{position:fixed;right:14px;bottom:62px;z-index:9998;width:360px;max-width:calc(100vw - 28px);
+#chat{position:fixed;right:14px;bottom:90px;z-index:9998;width:360px;max-width:calc(100vw - 28px);
   height:60vh;max-height:560px;background:var(--bg2);border:2px solid var(--border);
   box-shadow:0 0 24px var(--glow);display:none;flex-direction:column}
 #chat.open{display:flex}
@@ -336,6 +336,59 @@ body::after{content:'';position:fixed;inset:0;
 .chat-body{color:var(--fg)}
 .chat-del{background:0;border:0;color:#ff5555;cursor:pointer;font-family:'VT323',monospace;font-size:15px;margin-left:5px}
 .chat-empty{color:var(--fg-dim);text-align:center;padding:24px 10px}
+.chat-daysep{display:flex;align-items:center;gap:8px;color:var(--fg-dim);font-size:13px;letter-spacing:2px;margin:8px 0 5px;user-select:none}
+.chat-daysep::before,.chat-daysep::after{content:"";flex:1;border-top:1px solid var(--border)}
+.chat-quote{color:var(--fg-dim);font-size:13px;border-left:2px solid var(--accent);padding-left:6px;margin:2px 0 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-quote:hover{color:var(--fg)}
+.chat-quote .q-nick{color:var(--accent)}
+.chat-reply{background:0;border:0;color:var(--fg-dim);cursor:pointer;font-family:'VT323',monospace;font-size:15px;margin-left:5px;opacity:.55}
+.chat-reply:hover{color:var(--fg);opacity:1}
+.chat-msg.mention{background:rgba(255,255,255,.05);background:color-mix(in srgb,var(--accent) 12%,transparent);border-left:2px solid var(--accent);padding-left:4px;margin-left:-6px}
+.chat-msg.flash{animation:chat-flash 1s ease-out}
+@keyframes chat-flash{0%{background:var(--accent);color:var(--bg)}100%{background:transparent}}
+#chat-replybar{display:none;align-items:center;gap:6px;padding:4px 10px;border-top:1px solid var(--border);background:var(--bg2);color:var(--fg-dim);font-size:13px}
+#chat-replybar.show{display:flex}
+#chat-replybar .rb-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chat-replybar .rb-txt b{color:var(--accent);font-weight:normal}
+#chat-replybar button{background:0;border:0;color:#ff5555;cursor:pointer;font-family:'VT323',monospace;font-size:15px}
+/* nick colors + glow */
+.chat-nick-tag{text-shadow:0 0 6px currentColor}
+/* who's online */
+#chat-on{color:var(--fg-dim);letter-spacing:0;margin-left:6px;font-size:14px}
+#online-cnt.bump{animation:online-bump .5s ease-out}
+@keyframes online-bump{0%{text-shadow:0 0 12px currentColor;transform:scale(1.4)}100%{transform:scale(1)}}
+#online-wrap{cursor:default}
+#online-cnt{display:inline-block}
+/* CRT power-on when chat opens */
+#chat.open{animation:crt-on .22s ease-out;transform-origin:50% 100%}
+@keyframes crt-on{0%{transform:scaleY(.02);filter:brightness(4)}55%{transform:scaleY(1.03)}100%{transform:scaleY(1);filter:brightness(1)}}
+/* new messages slide in with a phosphor flicker */
+.chat-msg.new{animation:msg-in .35s ease-out}
+@keyframes msg-in{0%{opacity:0;transform:translateX(10px)}30%{opacity:1}45%{opacity:.4}60%{opacity:1}100%{transform:none}}
+/* now-playing share messages */
+.chat-msg.np .chat-body{color:var(--accent);cursor:pointer;text-shadow:0 0 6px var(--glow)}
+.chat-msg.np .chat-body:hover{text-decoration:underline}
+.np-icon{display:inline-block;animation:np-bob 1s ease-in-out infinite}
+@keyframes np-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+#chat-np{background:0;border:2px solid var(--border);color:var(--accent);font-family:'VT323',monospace;font-size:16px;padding:5px 9px;cursor:pointer}
+#chat-np:hover{background:var(--accent);color:var(--bg)}
+/* CHAT TICKER (bottom marquee) */
+#ticker{position:fixed;left:0;right:0;bottom:0;z-index:9996;height:26px;display:flex;align-items:center;
+  background:var(--bg2);border-top:1px solid var(--border);font-family:'VT323',monospace;font-size:15px;cursor:pointer;overflow:hidden}
+#ticker .tk-label{flex:none;padding:0 10px;color:var(--accent);letter-spacing:2px;border-right:1px solid var(--border);z-index:2;background:var(--bg2)}
+#ticker.blip .tk-label{animation:tk-blip .5s steps(2) 3}
+@keyframes tk-blip{0%{background:var(--accent);color:var(--bg)}100%{background:var(--bg2);color:var(--accent)}}
+#ticker .tk-scroll{flex:1;position:relative;height:100%;overflow:hidden}
+#ticker .tk-text{position:absolute;left:0;top:0;white-space:nowrap;line-height:26px;color:var(--fg);will-change:transform;animation:tk-scroll 20s linear infinite}
+@keyframes tk-scroll{0%{transform:translateX(100vw)}100%{transform:translateX(-100%)}}
+body{padding-bottom:30px}
+/* MINIMIZABLE SECTIONS */
+.sec-min{background:0;border:1px solid var(--fg-dim);color:var(--fg);font-family:'VT323',monospace;font-size:13px;
+  cursor:pointer;padding:0 6px;margin-left:8px;line-height:16px;flex:none}
+.sec-min:hover{background:var(--fg);color:var(--bg)}
+.sec-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .28s ease}
+.min>.sec-wrap{grid-template-rows:0fr}
+.sec-body{overflow:hidden;min-height:0}
 .chat-input-row{display:flex;gap:5px;padding:7px 8px;border-top:1px solid var(--border);background:var(--bg)}
 #chat-input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);color:var(--fg);
   font-family:'VT323',monospace;font-size:16px;padding:6px 8px;outline:none}
@@ -345,7 +398,7 @@ body::after{content:'';position:fixed;inset:0;
 #chat-send:hover{background:var(--fg);color:var(--bg)}
 @media(max-width:600px){
   #chat{right:0;left:0;bottom:0;width:100%;max-width:100%;height:78vh;max-height:none;border-width:2px 0 0 0}
-  #chat-toggle{right:8px;bottom:8px;font-size:15px;padding:7px 12px}
+  #chat-toggle{right:8px;bottom:34px;font-size:15px;padding:7px 12px}
   #chat-log{font-size:16px}
 }
 </style>
@@ -420,6 +473,7 @@ body::after{content:'';position:fixed;inset:0;
 
 <div class="status-bar">
   <span>NODE: <span style="color:var(--fg)">7</span>/16</span>
+  <span title="Users online right now" id="online-wrap">VOID: <span class="online" id="online-cnt">--</span> ONLINE</span>
   <span>USER: <span style="color:var(--fg)" id="user-type">LISTENER</span></span>
   <span>STATUS: <span class="online">ONLINE</span></span>
   <span>BAUD: <span style="color:var(--fg)">14400</span></span>
@@ -567,18 +621,27 @@ body::after{content:'';position:fixed;inset:0;
   <span style="color:var(--fg-dim);font-size:11px">build 0608c</span>
 </div>
 
+<!-- ===== CHAT TICKER ===== -->
+<div id="ticker" title="Open chat (Alt-Y)">
+  <span class="tk-label">&#9608; VOID CHAT</span>
+  <div class="tk-scroll"><span class="tk-text" id="ticker-text">... silence on the wire ... say something in the void chat ...</span></div>
+</div>
+
 <!-- ===== CHAT / SHOUTBOX ===== -->
 <button id="chat-toggle" title="Toggle chat (Alt-Y)">&#9635; CHAT<span class="chat-badge" id="chat-badge"></span></button>
 <div id="chat">
   <div class="chat-head">
-    <span class="chat-title">&#9618; CHAT</span>
+    <span class="chat-title">&#9618; CHAT<span id="chat-on" title=""></span></span>
     <span>as <span id="chat-nick" title="Change handle">anon</span></span>
     <span class="sp"></span>
+    <button id="chat-bell" title="Notify me on replies / @mentions">&#128277;</button>
     <button class="admin-only" id="chat-clear" title="Clear all messages (SysOp)">CLR</button>
     <button id="chat-close" title="Close (Alt-Y)">X</button>
   </div>
   <div id="chat-log"></div>
+  <div id="chat-replybar"><span>&#8618;</span><span class="rb-txt" id="chat-replytxt"></span><button id="chat-replycancel" title="Cancel reply (Esc)">&times;</button></div>
   <div class="chat-input-row">
+    <button id="chat-np" title="Share what you're listening to">&#9835;</button>
     <input id="chat-input" type="text" maxlength="280" placeholder="type a message… (Enter to send)" autocomplete="off" spellcheck="false">
     <button id="chat-send">SEND</button>
   </div>
@@ -824,6 +887,9 @@ async function initCloud() {
 
     // Poll for new tracks every 30s (Supabase realtime needs auth for RLS)
     setInterval(loadCloudTracks, 30000);
+
+    // Who's online (realtime presence)
+    initPresence();
   } catch(err) {
     console.error('Supabase init failed:', err);
     document.getElementById('fb-dot').className = 'fb-dot off';
@@ -1811,7 +1877,10 @@ if ('mediaSession' in navigator){
 // =============================================================
 // CHAT / SHOUTBOX (Alt-Y toggle, polling, anyone posts, SysOp moderates)
 // =============================================================
-const CHAT = { open: false, timer: null, nick: '', lastSeen: parseInt(LS.get('rv_chat_seen', '0'), 10) || 0 };
+const CHAT = { open: false, timer: null, nick: '', lastSeen: parseInt(LS.get('rv_chat_seen', '0'), 10) || 0,
+  replyTo: null, byId: {}, notif: LS.get('rv_chat_notif', '0') === '1',
+  lastNotified: parseInt(LS.get('rv_chat_notified', '0'), 10) || 0 };
+const REPLY_RE = /^>>(\d+)\s*/;   // BBS-style quote ref: ">>123 message" replies to msg id 123
 const $chat = (id) => document.getElementById(id);
 
 function setBadge(n){
@@ -1824,13 +1893,22 @@ function markSeen(maxId){
   if (maxId && maxId > CHAT.lastSeen){ CHAT.lastSeen = maxId; LS.set('rv_chat_seen', String(maxId)); }
   setBadge(0);
 }
-// Background check (runs while chat is closed) — lights the unread badge.
+// Background check (runs while chat is closed) — lights the unread badge + fires reply/mention notifications.
 async function chatCheckUnread(){
   if (CHAT.open || !S.cloudReady || !S.sb) return;
   try {
-    const { count, error } = await S.sb.from('messages').select('*', { count: 'exact', head: true }).gt('id', CHAT.lastSeen);
+    if (!CHAT.seeded){   // one-time backfill so ">>ref" replies resolve before the chat is ever opened
+      CHAT.seeded = true;
+      const { data: old } = await S.sb.from('messages').select('*').order('id', { ascending: false }).limit(60);
+      (old || []).forEach(m => CHAT.byId[m.id] = m);
+      if (old && old.length) updateTicker(old[0]);
+    }
+    const { data, error } = await S.sb.from('messages').select('*').gt('id', CHAT.lastSeen).order('id', { ascending: true }).limit(50);
     if (error) throw error;
-    setBadge(count || 0);
+    (data || []).forEach(m => CHAT.byId[m.id] = m);
+    setBadge((data || []).length);
+    maybeNotify(data || []);
+    if (data && data.length) updateTicker(data[data.length - 1]);
   } catch(e){}
 }
 setInterval(chatCheckUnread, 12000);
@@ -1841,6 +1919,7 @@ function setNick(n){
   if (!n) return false;
   CHAT.nick = n; LS.set('rv_nick', n);
   $chat('chat-nick').textContent = n;
+  initPresence();   // re-join presence under the new handle
   return true;
 }
 function ensureNick(){
@@ -1852,6 +1931,89 @@ function ensureNick(){
 }
 
 function chatTime(ts){ try { const d = new Date(ts); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); } catch(e){ return '--:--'; } }
+const CHAT_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function chatDayKey(ts){ const d = new Date(ts); return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
+function chatDayLabel(ts){
+  const d = new Date(ts), now = new Date();
+  if (chatDayKey(d) === chatDayKey(now)) return 'TODAY';
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  if (chatDayKey(d) === chatDayKey(yest)) return 'YESTERDAY';
+  return String(d.getDate()).padStart(2,'0') + ' ' + CHAT_MONTHS[d.getMonth()] + (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
+}
+function chatFullStamp(ts){ try { const d = new Date(ts); return String(d.getDate()).padStart(2,'0')+' '+CHAT_MONTHS[d.getMonth()]+' '+d.getFullYear()+' '+chatTime(ts); } catch(e){ return ''; } }
+function stripRef(body){ return String(body).replace(REPLY_RE, ''); }
+
+// =============================================================
+// WHO'S ONLINE (Supabase realtime presence — no table needed)
+// =============================================================
+const PRES = { ch: null, count: 0 };
+function initPresence(){
+  if (!S.cloudReady || !S.sb) return;
+  if (PRES.ch){ try { S.sb.removeChannel(PRES.ch); } catch(e){} PRES.ch = null; }
+  const nick = getNick() || 'anon';
+  const ch = S.sb.channel('rv-online', { config: { presence: { key: nick } } });
+  ch.on('presence', { event: 'sync' }, () => {
+    const nicks = Object.keys(ch.presenceState());
+    const n = nicks.length;
+    const cnt = document.getElementById('online-cnt');
+    if (cnt){
+      cnt.textContent = String(n);
+      if (n !== PRES.count){ cnt.classList.remove('bump'); void cnt.offsetWidth; cnt.classList.add('bump'); }
+    }
+    const wrap = document.getElementById('online-wrap');
+    if (wrap) wrap.title = 'In the void: ' + nicks.join(', ');
+    const co = document.getElementById('chat-on');
+    if (co){ co.textContent = ' [' + n + ' ON]'; co.title = nicks.join(', '); }
+    PRES.count = n;
+  });
+  ch.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED'){ try { await ch.track({ nick, at: Date.now() }); } catch(e){} }
+  });
+  PRES.ch = ch;
+}
+
+// Deterministic nick -> CRT hue (same handle = same color everywhere)
+function nickColor(nick){
+  let h = 0; const s = String(nick || '');
+  for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) >>> 0;
+  return 'hsl(' + (h % 360) + ',85%,65%)';
+}
+
+// ---- Now-playing share ("♫ Title — Artist", click plays it) ----
+const NP_RE = /^♫ /;
+function npShare(){
+  if (S.idx < 0 || !S.tracks[S.idx]){ alert('Nothing playing — load a track first.'); return; }
+  const t = S.tracks[S.idx];
+  const input = $chat('chat-input');
+  input.value = '♫ ' + t.title + (t.artist ? ' — ' + t.artist : '');
+  chatSend();
+}
+function npFind(text){
+  const s = String(text).toLowerCase();
+  let best = -1, bestLen = 0;
+  S.tracks.forEach((t, i) => {
+    const tt = (t.title || '').toLowerCase();
+    if (tt && s.startsWith(tt) && tt.length > bestLen){ best = i; bestLen = tt.length; }
+  });
+  return best;
+}
+
+// ---- Bottom ticker: latest shout scrolls across the terminal ----
+const TICKER = { lastId: 0 };
+function updateTicker(m){
+  if (!m || m.id === TICKER.lastId) return;
+  const first = TICKER.lastId === 0;
+  TICKER.lastId = m.id;
+  const el = document.getElementById('ticker-text');
+  const tk = document.getElementById('ticker');
+  if (!el) return;
+  const body = stripRef(m.body);
+  el.innerHTML = '<span style="color:' + nickColor(m.nick) + ';text-shadow:0 0 6px currentColor">&lt;' + esc(m.nick) + '&gt;</span> ' + esc(body);
+  const dur = Math.max(12, Math.min(45, (m.nick.length + body.length) * 0.35));
+  el.style.animation = 'none'; void el.offsetWidth;
+  el.style.animation = 'tk-scroll ' + dur + 's linear infinite';
+  if (!first && tk){ tk.classList.remove('blip'); void tk.offsetWidth; tk.classList.add('blip'); }
+}
 
 async function chatLoad(){
   if (!S.cloudReady || !S.sb) return;
@@ -1860,20 +2022,81 @@ async function chatLoad(){
     if (error) throw error;
     const maxId = (data && data.length) ? data[0].id : 0;
     renderChat((data || []).reverse());
-    if (CHAT.open) markSeen(maxId);   // viewing = caught up
+    if (CHAT.open && !document.hidden){
+      markSeen(maxId);   // viewing = caught up
+      if (maxId > CHAT.lastNotified){ CHAT.lastNotified = maxId; LS.set('rv_chat_notified', String(maxId)); }
+    } else maybeNotify(data || []);   // open but tab in background — still ping on replies
   } catch(e){ /* table may not exist yet — ignore */ }
 }
 
 function renderChat(msgs){
   const log = $chat('chat-log');
   if (!log) return;
+  msgs.forEach(m => CHAT.byId[m.id] = m);
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 50;
-  log.innerHTML = msgs.length ? msgs.map(m => `
-    <div class="chat-msg">
-      <span class="chat-time">${chatTime(m.created_at)}</span><span class="chat-nick-tag">&lt;${esc(m.nick)}&gt;</span><span class="chat-body">${esc(m.body)}</span><button class="chat-del admin-only" data-del="${m.id}" title="Delete">×</button>
-    </div>`).join('') : '<div class="chat-empty">No messages yet. Say something…</div>';
+  const me = (getNick() || '').toLowerCase();
+  const prevMax = CHAT.maxRendered;   // undefined on first render -> no entry animation
+  let html = '', lastDay = '', maxId = 0;
+  for (const m of msgs){
+    if (m.id > maxId) maxId = m.id;
+    const day = chatDayKey(m.created_at);
+    if (day !== lastDay){ html += `<div class="chat-daysep">${chatDayLabel(m.created_at)}</div>`; lastDay = day; }
+    let body = m.body, quote = '', ref = null;
+    const rm = REPLY_RE.exec(body);
+    if (rm){
+      body = body.slice(rm[0].length);
+      ref = CHAT.byId[+rm[1]] || null;
+      quote = ref
+        ? `<div class="chat-quote" data-ref="${ref.id}">&#8618; <span class="q-nick">&lt;${esc(ref.nick)}&gt;</span> ${esc(stripRef(ref.body).slice(0, 60))}</div>`
+        : `<div class="chat-quote">&#8618; &gt;&gt;${rm[1]}</div>`;
+    }
+    const isNp = NP_RE.test(body);
+    let bodyHtml;
+    if (isNp){
+      const npText = body.slice(2);
+      bodyHtml = `<span class="chat-body" title="Click to play"><span class="np-icon">&#9835;</span> ${esc(npText)}</span>`;
+    } else {
+      bodyHtml = `<span class="chat-body">${esc(body)}</span>`;
+    }
+    const mention = me && (body.toLowerCase().includes('@' + me) || (ref && ref.nick.toLowerCase() === me));
+    const isNew = prevMax !== undefined && m.id > prevMax;
+    html += `
+    <div class="chat-msg${mention ? ' mention' : ''}${isNp ? ' np' : ''}${isNew ? ' new' : ''}" data-id="${m.id}">${quote}
+      <span class="chat-time" title="${esc(chatFullStamp(m.created_at))}">${chatTime(m.created_at)}</span><span class="chat-nick-tag" style="color:${nickColor(m.nick)}">&lt;${esc(m.nick)}&gt;</span>${bodyHtml}<button class="chat-reply" data-reply="${m.id}" title="Reply">&#8618;</button><button class="chat-del admin-only" data-del="${m.id}" title="Delete">×</button>
+    </div>`;
+  }
+  CHAT.maxRendered = maxId;
+  log.innerHTML = msgs.length ? html : '<div class="chat-empty">No messages yet. Say something…</div>';
+  if (msgs.length) updateTicker(msgs[msgs.length - 1]);
   log.querySelectorAll('.chat-del').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); chatDelete(+b.dataset.del); }));
+  log.querySelectorAll('.chat-reply').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); startReply(+b.dataset.reply); }));
+  log.querySelectorAll('.chat-msg.np .chat-body').forEach(el => el.addEventListener('click', () => {
+    const m = CHAT.byId[+el.closest('.chat-msg').dataset.id];
+    if (!m) return;
+    const i = npFind(stripRef(m.body).slice(2));
+    if (i >= 0) loadTrack(i, true);
+    else alert('Track not found in the library.');
+  }));
+  log.querySelectorAll('.chat-quote[data-ref]').forEach(q => q.addEventListener('click', () => {
+    const el = log.querySelector(`.chat-msg[data-id="${q.dataset.ref}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  }));
   if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function startReply(id){
+  const m = CHAT.byId[id];
+  if (!m) return;
+  CHAT.replyTo = m;
+  $chat('chat-replytxt').innerHTML = `Replying to <b>&lt;${esc(m.nick)}&gt;</b> ${esc(stripRef(m.body).slice(0, 60))}`;
+  $chat('chat-replybar').classList.add('show');
+  $chat('chat-input').focus();
+}
+function cancelReply(){
+  CHAT.replyTo = null;
+  $chat('chat-replybar').classList.remove('show');
 }
 
 async function chatSend(){
@@ -1882,12 +2105,50 @@ async function chatSend(){
   if (!body) return;
   if (!S.cloudReady || !S.sb){ alert('Chat needs the cloud connection.'); return; }
   const nick = ensureNick();
+  const full = (CHAT.replyTo ? '>>' + CHAT.replyTo.id + ' ' : '') + body;
   input.value = '';
+  cancelReply();
   try {
-    const { error } = await S.sb.from('messages').insert({ nick, body });
+    const { error } = await S.sb.from('messages').insert({ nick, body: full.slice(0, 280) });
     if (error) throw error;
     await chatLoad();
   } catch(e){ console.error('chat send failed', e); alert('Could not send: ' + ((e && e.message) || e)); }
+}
+
+// ---- Reply / @mention notifications (opt-in via the bell) ----
+function setBell(){ const b = $chat('chat-bell'); if (b){ b.textContent = CHAT.notif ? '\u{1F514}' : '\u{1F515}'; b.style.opacity = CHAT.notif ? '1' : '.55'; } }
+async function toggleBell(){
+  if (!CHAT.notif){
+    if (typeof Notification === 'undefined'){ alert('This browser has no notification support.'); return; }
+    if (Notification.permission !== 'granted'){
+      const p = await Notification.requestPermission();
+      if (p !== 'granted'){ alert('Notifications are blocked by the browser.'); return; }
+    }
+    CHAT.notif = true;
+  } else CHAT.notif = false;
+  LS.set('rv_chat_notif', CHAT.notif ? '1' : '0');
+  setBell();
+}
+function maybeNotify(msgs){
+  if (!CHAT.notif || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const me = (getNick() || '').toLowerCase();
+  if (!me) return;
+  for (const m of msgs){
+    if (m.id <= CHAT.lastNotified) continue;
+    CHAT.lastNotified = m.id;
+    if (m.nick.toLowerCase() === me) continue;
+    const rm = REPLY_RE.exec(m.body);
+    const ref = rm && CHAT.byId[+rm[1]];
+    const isReply = !!(ref && ref.nick.toLowerCase() === me);
+    const isMention = m.body.toLowerCase().includes('@' + me);
+    if (!isReply && !isMention) continue;
+    try {
+      const n = new Notification('[RADIOVOID] <' + m.nick + '>' + (isReply ? ' replied' : ''), {
+        body: stripRef(m.body).slice(0, 120), icon: './icon-192.png', tag: 'rv-chat' });
+      n.onclick = () => { try { window.focus(); } catch(e){} toggleChat(true); n.close(); };
+    } catch(e){}
+  }
+  LS.set('rv_chat_notified', String(CHAT.lastNotified));
 }
 
 async function chatDelete(id){
@@ -1919,7 +2180,43 @@ $chat('chat-close').addEventListener('click', () => toggleChat(false));
 $chat('chat-send').addEventListener('click', chatSend);
 $chat('chat-clear').addEventListener('click', chatClear);
 $chat('chat-nick').addEventListener('click', () => { const n = prompt('Change handle:', getNick()); if (n !== null) setNick(n); });
-$chat('chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); chatSend(); } });
+$chat('chat-bell').addEventListener('click', toggleBell);
+$chat('chat-replycancel').addEventListener('click', cancelReply);
+$chat('chat-np').addEventListener('click', npShare);
+document.getElementById('ticker').addEventListener('click', () => toggleChat(true));
+setBell();
+
+// =============================================================
+// MINIMIZABLE SECTIONS ([-]/[+] like the app, state remembered)
+// =============================================================
+function makeCollapsible(key, sel, headSel){
+  const sec = document.querySelector(sel);
+  if (!sec) return;
+  const head = sec.querySelector(headSel);
+  if (!head) return;
+  const wrap = document.createElement('div'); wrap.className = 'sec-wrap';
+  const body = document.createElement('div'); body.className = 'sec-body';
+  [...sec.childNodes].forEach(ch => { if (ch !== head) body.appendChild(ch); });   // childNodes: text nodes too (MOTD)
+  wrap.appendChild(body); sec.appendChild(wrap);
+  const btn = document.createElement('button');
+  btn.className = 'sec-min'; btn.title = 'Minimize section';
+  const apply = (min) => { sec.classList.toggle('min', min); btn.textContent = min ? '[+]' : '[–]'; };
+  apply(LS.get('rv_min_' + key, '0') === '1');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const min = !sec.classList.contains('min');
+    apply(min); LS.set('rv_min_' + key, min ? '1' : '0');
+  });
+  head.appendChild(btn);
+}
+makeCollapsible('motd', '.motd', 'pre');
+makeCollapsible('viz', '.viz-box', '.viz-head');
+makeCollapsible('np',  '.np',      '.np-head');
+makeCollapsible('pl',  '.pl',      '.pl-head');
+$chat('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter'){ e.preventDefault(); chatSend(); }
+  if (e.key === 'Escape' && CHAT.replyTo){ e.preventDefault(); cancelReply(); }
+});
 document.addEventListener('keydown', (e) => { if (e.altKey && (e.key === 'y' || e.key === 'Y')){ e.preventDefault(); toggleChat(); } });
 
 // =============================================================
