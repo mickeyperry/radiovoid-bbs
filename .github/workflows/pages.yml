@@ -2,6 +2,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+  schedule:
+    - cron: '0 3 * * *'   # daily rebuild so newly uploaded tracks get share pages
+  workflow_dispatch:
 permissions:
   contents: read
   pages: write
@@ -14,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Generate track share pages (Open Graph embeds)
+        run: node scripts/gen-share-pages.mjs
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:

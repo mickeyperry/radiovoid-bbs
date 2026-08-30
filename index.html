@@ -1348,6 +1348,7 @@ function renderPlaylist(filter){
       <span class="trk-year">${t.year||'—'}</span>
       <span class="trk-bpm">${t.bpm||'—'}</span>
       <span class="trk-dur">${t.duration?fmt(t.duration):'--:--'}</span>
+      ${t.cloud&&t.id?`<button class="trk-add trk-share" data-sid="${t.id}" title="Share track">⤴</button>`:''}
       <button class="trk-add" data-id="${t.id||''}" title="${pl?'Remove from playlist':'Add to a playlist'}">${pl?'✕':'+'}</button>
       <button class="trk-edit admin-only" data-edit="${t.i}" title="Edit metadata (SysOp)">✎</button>
       <button class="trk-del admin-only" data-del="${t.i}" title="Delete from cloud (SysOp)">DEL</button>
@@ -1356,7 +1357,10 @@ function renderPlaylist(filter){
   list.querySelectorAll('.trk').forEach(el => {
     el.addEventListener('click', () => loadTrack(+el.dataset.i, true));
   });
-  list.querySelectorAll('.trk-add').forEach(btn => {
+  list.querySelectorAll('.trk-share').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); shareTrack(btn.dataset.sid); });
+  });
+  list.querySelectorAll('.trk-add:not(.trk-share)').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
@@ -1370,6 +1374,21 @@ function renderPlaylist(filter){
   list.querySelectorAll('.trk-del').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); deleteTrack(S.tracks[+btn.dataset.del]); });
   });
+}
+
+// Share a track: the /s/<id>/ page carries Open Graph tags so the link
+// unfurls as a rich embed on Facebook & co, then bounces to ?play=<id>.
+function shareTrack(id){
+  const t = S.tracks.find(x => x.id === id);
+  const url = 'https://mickeyperry.github.io/radiovoid-bbs/s/' + id + '/';
+  const title = t ? t.title + (t.artist && t.artist !== 'Unknown' ? ' — ' + t.artist : '') : 'RADIOVOID BBS';
+  if (navigator.share){
+    navigator.share({ title, text: '▶ ' + title + ' · RADIOVOID BBS', url }).catch(()=>{});
+    return;
+  }
+  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
+    .then(() => flash('SHARE LINK COPIED'))
+    .catch(() => prompt('Share link:', url));
 }
 
 // Derive the storage object key from a public URL (everything after "/tracks/").

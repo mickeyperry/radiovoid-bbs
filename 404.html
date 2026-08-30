@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RADIOVOID BBS</title>
+<style>body{background:#000810;color:#00aaff;font-family:monospace;text-align:center;padding-top:20vh}a{color:#66ccff}</style>
+</head>
+<body>
+<p>[ R A D I O V O I D ] · reconnecting…</p>
+<script>
+// Share links for tracks uploaded after the last deploy don't have a static
+// page yet — recover the id from /s/<id>/ and jump straight to the player.
+var m = location.pathname.match(/\/s\/([A-Za-z0-9-]+)\/?/);
+location.replace('/radiovoid-bbs/' + (m ? '?play=' + m[1] : ''));
+</script>
+</body>
+</html>
