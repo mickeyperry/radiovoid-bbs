@@ -1289,8 +1289,11 @@ function activePlaylist(){ return S.playlists.find(p => p.id === S.view) || null
 function refreshViewSelect(){
   const sel = document.getElementById('view-select');
   sel.innerHTML = '<option value="library">LIBRARY</option>' +
+    '<option value="__music">MUSIC (MP3/WAV)</option>' +
+    '<option value="__mods">MODS (TRACKER)</option>' +
     S.playlists.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  if (S.view !== 'library' && !S.playlists.some(p => p.id === S.view)) S.view = 'library';
+  if (S.view !== 'library' && S.view !== '__music' && S.view !== '__mods' &&
+      !S.playlists.some(p => p.id === S.view)) S.view = 'library';
   sel.value = S.view;
 }
 
@@ -1305,6 +1308,8 @@ function viewTracks(filter){
   } else {
     rows = S.tracks.map((t,i) => Object.assign({}, t, {i}));
   }
+  if (S.view === '__music')     rows = rows.filter(t => !isModTrack(t));
+  else if (S.view === '__mods') rows = rows.filter(t => isModTrack(t));
   if (filter) rows = rows.filter(t =>
     (t.title||'').toLowerCase().includes(filter) || (t.artist||'').toLowerCase().includes(filter));
   const s = S.sort;
@@ -1321,7 +1326,8 @@ function renderPlaylist(filter){
   const list = document.getElementById('tl');
   const pl = activePlaylist();
   const rows = viewTracks(filter);
-  document.getElementById('pl-title').textContent = pl ? pl.name.toUpperCase() : 'LIBRARY';
+  document.getElementById('pl-title').textContent = pl ? pl.name.toUpperCase()
+    : S.view === '__music' ? 'MUSIC' : S.view === '__mods' ? 'MODS' : 'LIBRARY';
   document.getElementById('trk-cnt').textContent = rows.length;
   document.getElementById('pl-del').style.display = pl ? '' : 'none';
 
