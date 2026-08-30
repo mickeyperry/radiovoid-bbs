@@ -126,25 +126,21 @@ public class VizView extends View {
             for (int i5 = 0; i5 < length; i5 += i4) {
                 float f3 = 1.0f;
                 float f4 = 0.0f;
-                int i6 = 0;
-                while (true) {
-                    int i7 = i4 / 2;
-                    if (i6 < i7) {
-                        int i8 = i5 + i6;
-                        int i9 = i7 + i8;
-                        float f5 = fArr[i9];
-                        float f6 = fArr2[i9];
-                        float f7 = (f5 * f3) - (f6 * f4);
-                        float f8 = (f5 * f4) + (f6 * f3);
-                        fArr[i9] = fArr[i8] - f7;
-                        fArr2[i9] = fArr2[i8] - f8;
-                        fArr[i8] = fArr[i8] + f7;
-                        fArr2[i8] = fArr2[i8] + f8;
-                        float f9 = (f3 * fCos) - (f4 * fSin);
-                        f4 = (f4 * fCos) + (f3 * fSin);
-                        i6++;
-                        f3 = f9;
-                    }
+                int i7 = i4 / 2;
+                for (int i6 = 0; i6 < i7; i6++) {
+                    int i8 = i5 + i6;
+                    int i9 = i7 + i8;
+                    float f5 = fArr[i9];
+                    float f6 = fArr2[i9];
+                    float f7 = (f5 * f3) - (f6 * f4);
+                    float f8 = (f5 * f4) + (f6 * f3);
+                    fArr[i9] = fArr[i8] - f7;
+                    fArr2[i9] = fArr2[i8] - f8;
+                    fArr[i8] = fArr[i8] + f7;
+                    fArr2[i8] = fArr2[i8] + f8;
+                    float f9 = (f3 * fCos) - (f4 * fSin);
+                    f4 = (f4 * fCos) + (f3 * fSin);
+                    f3 = f9;
                 }
             }
         }
