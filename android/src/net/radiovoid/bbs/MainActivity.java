@@ -2201,7 +2201,8 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             return !track.isModule();
         }
         if (this.view.equals("MODS")) {
-            return track.isModule();
+            // Honorary mods: titles shown under MODS regardless of file format.
+            return track.isModule() || "ariel must die".equalsIgnoreCase(track.title);
         }
         if (this.view.startsWith("PL:")) {
             return playlistIds(this.view.substring(3)).contains(track.id);

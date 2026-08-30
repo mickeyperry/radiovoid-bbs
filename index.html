@@ -1309,7 +1309,7 @@ function viewTracks(filter){
     rows = S.tracks.map((t,i) => Object.assign({}, t, {i}));
   }
   if (S.view === '__music')     rows = rows.filter(t => !isModTrack(t));
-  else if (S.view === '__mods') rows = rows.filter(t => isModTrack(t));
+  else if (S.view === '__mods') rows = rows.filter(t => isModTrack(t) || MOD_HONORARY.includes((t.title||'').toLowerCase()));
   if (filter) rows = rows.filter(t =>
     (t.title||'').toLowerCase().includes(filter) || (t.artist||'').toLowerCase().includes(filter));
   const s = S.sort;
@@ -1565,6 +1565,8 @@ document.getElementById('sort-select').value = S.sort;
 // MOD / TRACKER ENGINE (libopenmpt via chiptune2.js)
 // =============================================================
 const MOD_RE = /\.(mod|xm|s3m|it|mptm|mtm|umx|mo3|669|med|far|okt|ptm|stm|ult|dbm|dmf|dsm|gdm|imf|j2b|mdl|psm|amf|ams|nst|wow|digi|dtm)$/i;
+// Honorary mods — titles shown under the MODS view regardless of file format.
+const MOD_HONORARY = ['ariel must die'];
 function isModTrack(t){
   return MOD_RE.test(t.file || '') || MOD_RE.test((t.url || '').split('?')[0]);
 }
